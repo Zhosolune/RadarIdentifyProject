@@ -1,0 +1,116 @@
+{
+    "data_processing": {
+        "slice_length": 250,
+        "slice_dim": 4,
+        "data_columns": {
+            "CF": 1,
+            "PW": 2,
+            "DOA": 4,
+            "PA": 5,
+            "TOA": 7
+        },
+        "data_units": {
+            "CF": "MHz",
+            "PW": "us",
+            "DOA": "deg",
+            "PA": "dB",
+            "TOA": "0.1us"
+        },
+        "excel_has_header": false,
+        "excel_chunk_size": 40000,
+        "cpu_load": 0.5
+    },
+    "clustering": {
+        "min_cluster_size": 8,
+        "epsilon_cf": 2.0,
+        "epsilon_pw": 0.2,
+        "min_pts": 1,
+        "pa_weight": 0.5,
+        "dtoa_weight": 0.5,
+        "threshold": 0.8
+    },
+    "plotting": {
+        "base_configs": {
+            "PA": {
+                "y_min": 40,
+                "y_max": 120,
+                "img_height": 80,
+                "img_width": 400
+            },
+            "DTOA": {
+                "y_min": 0,
+                "y_max": 3000,
+                "img_height": 250,
+                "img_width": 500
+            },
+            "PW": {
+                "y_min": 0,
+                "y_max": 200,
+                "img_height": 200,
+                "img_width": 400
+            },
+            "DOA": {
+                "y_min": 0,
+                "y_max": 360,
+                "img_height": 120,
+                "img_width": 400
+            }
+        },
+        "band_configs": [
+            {
+                "name": "L波段",
+                "min_freq": 1000,
+                "max_freq": 2000,
+                "plot_config": {
+                    "y_min": 1000,
+                    "y_max": 2000,
+                    "img_height": 400,
+                    "img_width": 400
+                }
+            },
+            {
+                "name": "S波段",
+                "min_freq": 2000,
+                "max_freq": 4000,
+                "plot_config": {
+                    "y_min": 2000,
+                    "y_max": 4000,
+                    "img_height": 400,
+                    "img_width": 400
+                }
+            },
+            {
+                "name": "C波段",
+                "min_freq": 4000,
+                "max_freq": 8000,
+                "plot_config": {
+                    "y_min": 4000,
+                    "y_max": 8000,
+                    "img_height": 400,
+                    "img_width": 400
+                }
+            },
+            {
+                "name": "X波段",
+                "min_freq": 8000,
+                "max_freq": 12000,
+                "plot_config": {
+                    "y_min": 8000,
+                    "y_max": 12000,
+                    "img_height": 400,
+                    "img_width": 400
+                }
+            }
+        ],
+        "temp_dir": "./temp",
+        "save_dir": "./result"
+    },
+    "ui": {
+        "window_x": null,
+        "window_y": null,
+        "window_width": null,
+        "window_height": null,
+        "last_import_dir": "F:\\MyWorkspace\\BaiduSyncdisk\\Part_timeJob\\240817\\c",
+        "remember_window_position": false
+    }
+}

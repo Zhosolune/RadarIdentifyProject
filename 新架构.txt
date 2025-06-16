@@ -1,0 +1,62 @@
+radar_system/
+├── domain/                    # 领域层：核心业务逻辑
+│   ├── signal/               
+│   │   ├── signal.py        # 从 data_processor.py 提取信号数据处理
+│   │   ├── slice.py         # 从 data_processor.py 提取切片处理
+│   │   └── cluster.py       # 从 cluster_processor.py 和 roughly_clustering.py 提取
+│   └── recognition/         
+│       ├── feature.py       # 从 params_extractor.py 提取
+│       └── predictor.py     # 从 model_predictor.py 提取
+│
+├── application/              # 应用层：业务流程编排
+│   ├── async_tasks/               # 异步任务处理
+│   │   ├── signal_tasks.py  # 信号处理相关的异步任务
+│   │   ├── cluster_tasks.py # 聚类分析相关的异步任务
+│   │   └── data_import_tasks.py # 数据导入相关的异步任务
+│   │   └── plot_tasks.py # 图像绘制相关的异步任务
+│   │   └── recognition_tasks.py # 识别相关的异步任务
+│   │   └── save_tasks.py # 结果保存相关的异步任务
+│   │
+│   ├── signal_service.py    # 从 data_controller.py 提取信号处理流程
+│   ├── cluster_service.py   # 从 data_controller.py 提取聚类分析流程
+│   └── recognition_service.py # 从 data_controller.py 提取识别流程
+│
+├── infrastructure/          # 基础设施层
+│   ├── persistence/        
+│   │   ├── excel_reader.py # 从 data_processor.py 提取Excel读取
+│   │   └── file_storage.py # 从 plot_manager.py 提取文件存储
+│   │
+│   ├── ml/                 
+│   │   ├── models/         # 复制 model_wm/ 目录
+│   │   └── model_loader.py # 从 model_predictor.py 提取
+│   │
+│   ├── async_tasks/              # 异步处理基础设施
+│   │   ├── thread_pool.py  # 线程池管理器
+│   │   └── task_queue.py   # 任务队列管理
+│   │
+│   └── common/             
+│       ├── config.py       # 整合所有配置
+│       ├── logging.py      # 从 log_manager.py 增强
+│       └── exceptions.py   # 统一异常处理
+│
+├── interface/              # 接口层
+│   ├── gui/               
+│   │   ├── views/         
+│   │   │   ├── main_view.py        # 从 main_window.py 提取基础框架
+│   │   │   └── view_controller.py   # 从 main_window.py 提取控制逻辑
+│   │   │
+│   │   ├── widgets/           
+│   │   │   ├── plot_widget.py      # 复制 plot_widget.py
+│   │   │   ├── loading_spinner.py  # 复制 loading_spinner.py
+│   │   │   └── switch_widget.py    # 复制 switch_widget.py
+│   │   │
+│   │   ├── layout/           
+│   │   │   └── main_layout.py     # 复制 ui_functions.py 的 setup_ui
+│   │   │
+│   │   └── styles/           
+│   │       ├── style_constants.py  # 从 style_manager.py 复制 get_dimensions
+│   │       └── style_sheets.py     # 从 style_manager.py 复制 get_styles
+│   │
+│   └── api/               # 预留API接口
+│
+└── main.py                # 程序入口

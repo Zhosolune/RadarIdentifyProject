@@ -1,0 +1,131 @@
+radar_system/
+├── domain/                    # 领域层：核心业务逻辑
+│   ├── signal/               
+│   │   ├── signal_type.py    # 新增：信号类型枚举定义
+│   │   ├── validator.py      # 新增：信号数据验证规则
+│   │   ├── repository.py     # 新增：信号数据仓储接口
+│   │   ├── signal.py         # 来源：project/cores/data_processor.py 中的信号处理逻辑
+│   │   ├── slice.py          # 来源：project/cores/data_processor.py 中的切片处理逻辑
+│   │   └── cluster.py        # 来源：project/cores/cluster_processor.py
+│   │
+│   └── recognition/         
+│       ├── feature.py        # 来源：project/cores/params_extractor.py
+│       ├── predictor.py      # 来源：project/cores/model_predictor.py
+│       ├── validator.py      # 新增：特征和预测结果验证
+│       └── repository.py     # 新增：识别结果仓储接口
+│
+├── application/              # 应用层：业务流程编排
+│   ├── dto/                  # 新增：数据传输对象
+│   │   ├── signal_dto.py     # 新增：信号数据传输对象
+│   │   ├── cluster_dto.py    # 新增：聚类结果传输对象
+│   │   └── recognition_dto.py # 新增：识别结果传输对象
+│   │
+│   ├── events/               # 新增：领域事件
+│   │   ├── signal_events.py  # 新增：信号处理相关事件
+│   │   ├── cluster_events.py # 新增：聚类相关事件
+│   │   └── recognition_events.py # 新增：识别相关事件
+│   │
+│   ├── async_tasks/          # 异步任务处理
+│   │   ├── task_status.py    # 新增：任务状态管理
+│   │   ├── signal_tasks.py   # 来源：project/ui/data_controller.py 中的DataWorker
+│   │   ├── cluster_tasks.py  # 来源：project/cores/cluster_processor.py 中的异步处理
+│   │   ├── recognition_tasks.py # 来源：project/ui/data_controller.py 中的IdentifyWorker
+│   │   ├── plot_tasks.py     # 来源：project/cores/plot_manager.py
+│   │   └── save_tasks.py     # 来源：project/cores/plot_manager.py 中的保存功能
+│   │
+│   ├── signal_service.py     # 来源：project/ui/data_controller.py 中的信号处理流程
+│   ├── cluster_service.py    # 来源：project/ui/data_controller.py 中的聚类分析流程
+│   └── recognition_service.py # 来源：project/ui/data_controller.py 中的识别流程
+│
+├── infrastructure/          # 基础设施层
+│   ├── cache/               # 新增：缓存管理
+│   │   ├── signal_cache.py  # 新增：信号数据缓存
+│   │   └── result_cache.py  # 新增：处理结果缓存
+│   │
+│   ├── persistence/        
+│   │   ├── database/        # 新增：数据库支持
+│   │   │   ├── models/      # 新增：数据库模型
+│   │   │   └── repositories/ # 新增：仓储实现
+│   │   ├── excel_reader.py  # 来源：project/cores/data_processor.py 中的Excel读取
+│   │   └── file_storage.py  # 来源：project/cores/plot_manager.py 中的文件存储
+│   │
+│   ├── ml/                 
+│   │   ├── models/          # 来源：project/model_wm/
+│   │   └── model_loader.py  # 来源：project/cores/model_predictor.py 中的模型加载
+│   │
+│   ├── metrics/             # 新增：性能指标
+│   │   ├── performance.py   # 新增：性能监控
+│   │   └── statistics.py    # 新增：统计分析
+│   │
+│   ├── async_tasks/         # 异步处理基础设施
+│   │   ├── thread_pool.py   # 来源：project/ui/data_controller.py 中的线程管理
+│   │   └── task_queue.py    # 来源：project/ui/data_controller.py 中的任务队列
+│   │
+│   └── common/             
+│       ├── config.py        # 来源：project中分散的配置整合
+│       ├── logging.py       # 来源：project/cores/log_manager.py
+│       └── exceptions.py    # 新增：统一异常处理
+│
+├── interface/              # 接口层
+│   ├── gui/               
+│   │   ├── dto_assembler/   # 新增：DTO转换
+│   │   │   ├── signal_assembler.py    # 新增：信号数据转换
+│   │   │   └── result_assembler.py    # 新增：结果数据转换
+│   │   │
+│   │   ├── event_handlers/  # 新增：UI事件处理
+│   │   │   ├── signal_handlers.py     # 新增：信号相关事件处理
+│   │   │   └── result_handlers.py     # 新增：结果相关事件处理
+│   │   │
+│   │   ├── middleware/      # 新增：UI中间件
+│   │   │   ├── error_handler.py       # 新增：错误处理中间件
+│   │   │   └── loading_handler.py     # 新增：加载状态处理
+│   │   │
+│   │   ├── views/         
+│   │   │   ├── main_view.py          # 来源：project/ui/main_window.py
+│   │   │   └── view_controller.py     # 来源：project/ui/main_window.py 中的控制逻辑
+│   │   │
+│   │   ├── widgets/           
+│   │   │   ├── plot_widget.py        # 来源：project/ui/plot_widget.py
+│   │   │   ├── loading_spinner.py    # 来源：project/ui/loading_spinner.py
+│   │   │   └── switch_widget.py      # 来源：project/ui/switch_widget.py
+│   │   │
+│   │   ├── layout/           
+│   │   │   └── main_layout.py        # 来源：project/ui/ui_functions.py
+│   │   │
+│   │   └── styles/           
+│   │       ├── style_constants.py     # 来源：project/ui/style_manager.py
+│   │       └── style_sheets.py        # 来源：project/ui/style_manager.py
+│   │
+│   └── api/                # 新增：预留API接口
+│       ├── routes/         # 新增：API路由
+│       ├── middleware/     # 新增：API中间件
+│       └── validators/     # 新增：API参数验证
+│
+└── main.py                # 来源：project/main.py
+
+
+
+领域层(Domain)改进项：
+1、validator.py（领域对象验证器）
+作用：确保领域对象的数据完整性和业务规则符合性
+具体功能：
+验证雷达信号数据的格式正确性
+检查信号参数是否在有效范围内
+确保切片数据满足处理要求
+验证聚类参数的合法性
+价值：避免无效数据流入系统核心处理流程，提前发现问题
+2、repository.py（仓储接口）
+作用：定义领域对象的存取规范
+具体功能：
+规范化数据访问接口
+定义信号数据的存储和检索方法
+约束聚类结果的持久化操作
+统一特征数据的访问方式
+价值：解耦领域逻辑和数据访问实现，便于切换存储方案
+3、signal_type.py（信号类型枚举）
+作用：统一定义系统中的信号类型
+具体功能：
+枚举不同类型的雷达信号
+定义信号特征的分类标准
+规范化信号处理流程中的类型判断
+价值：提高代码可读性，减少魔法字符串，便于维护

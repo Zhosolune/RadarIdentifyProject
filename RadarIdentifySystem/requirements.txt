@@ -1,0 +1,13 @@
+pyqt5~=5.15.11
+matplotlib~=3.9.2
+numpy~=2.0.2
+pillow~=11.0.0
+scipy~=1.14.1
+pandas~=2.2.3
+tensorflow~=2.18.0
+keras~=3.8.0
+setuptools~=75.6.0
+pyinstaller==6.11.1
+openpyxl~=3.1.5
+scikit-learn~=1.6.0
+qasync>=0.24.0

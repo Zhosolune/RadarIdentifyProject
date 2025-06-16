@@ -1,0 +1,272 @@
+一、项目树状结构：
+
+RadarIdentifySystem/              # 项目根目录
+├── radar_system/                # 主要代码目录，包含所有核心功能实现
+│   ├── domain/                 # 领域层：实现核心业务逻辑和领域规则
+│   │   ├── signal/            # 信号处理领域，负责信号数据的处理和分析
+│   │   │   ├── signal_type.py # 定义雷达信号类型枚举，包括X波段、C波段等信号类型的分类标准
+│   │   │   ├── validator.py   # 验证信号数据的有效性，包括频率范围、脉宽范围、幅度范围等参数验证
+│   │   │   ├── repository.py  # 定义信号数据存取接口，规范化数据访问方式
+│   │   │   ├── signal.py      # 实现信号数据模型和基础处理，包括信号参数提取、数据清洗等
+│   │   │   ├── slice.py       # 实现信号切片处理，包括时间窗口划分、数据分组等
+│   │   │   └── cluster.py     # 实现信号聚类分析，包括DBSCAN聚类、参数自适应等功能
+│   │   │
+│   │   └── recognition/       # 识别领域，负责特征提取和模式识别
+│   │       ├── feature.py     # 实现特征提取器，包括CF、PW、DOA等特征的提取和预处理
+│   │       ├── predictor.py   # 实现预测器，包括PA和DTOA的分类预测
+│   │       ├── validator.py   # 验证特征和预测结果，确保结果的可靠性
+│   │       └── repository.py  # 定义识别结果的存取接口，规范化结果数据的访问
+│   │
+│   ├── application/           # 应用层：协调业务流程
+│   │   ├── dto/               # 数据传输对象，用于层间数据交换
+│   │   │   ├── signal_dto.py  # 定义信号数据传输对象，用于层间数据传递
+│   │   │   ├── cluster_dto.py # 定义聚类结果传输对象，包括聚类参数和结果
+│   │   │   └── recognition_dto.py # 定义识别结果传输对象，包括预测结果和置信度
+│   │   │
+│   │   ├── events/            # 领域事件定义，实现领域驱动设计
+│   │   │   ├── signal_events.py   # 定义信号处理相关事件，如数据加载、预处理完成等
+│   │   │   ├── cluster_events.py  # 定义聚类相关事件，如聚类开始、完成等
+│   │   │   └── recognition_events.py # 定义识别相关事件，如识别开始、完成等
+│   │   │
+│   │   ├── async_tasks/       # 异步任务处理，提高系统响应性
+│   │   │   ├── task_status.py # 管理任务状态，包括进度追踪和状态更新
+│   │   │   ├── signal_tasks.py # 处理信号相关的异步任务，如数据加载和预处理
+│   │   │   ├── cluster_tasks.py # 处理聚类相关的异步任务，包括参数优化和结果验证
+│   │   │   ├── recognition_tasks.py # 处理识别相关的异步任务，包括模型预测和结果整合
+│   │   │   ├── plot_tasks.py  # 处理绘图相关的异步任务，包括实时显示和结果可视化
+│   │   │   └── save_tasks.py  # 处理保存相关的异步任务，包括数据导出和结果保存
+│   │   │
+│   │   ├── signal_service.py  # 协调信号处理流程，包括数据加载、预处理等
+│   │   ├── cluster_service.py # 协调聚类分析流程，包括参数设置、结果验证等
+│   │   └── recognition_service.py # 协调识别流程，包括特征提取、模型预测等
+│   │
+│   ├── infrastructure/       # 基础设施层：提供技术支持和工具
+│   │   ├── cache/            # 缓存管理，优化性能
+│   │   │   ├── signal_cache.py # 实现信号数据的缓存管理，优化数据访问性能
+│   │   │   └── result_cache.py # 实现处理结果的缓存管理，减少重复计算
+│   │   │
+│   │   ├── persistence/      # 持久化管理，处理数据存储
+│   │   │   ├── excel_reader.py # 实现Excel数据的读取和解析，支持多种数据格式
+│   │   │   └── file_storage.py # 实现文件存储管理，包括临时文件和结果文件的处理
+│   │   │
+│   │   ├── ml/               # 机器学习基础设施，支持模型应用
+│   │   │   ├── models/       # 存放训练好的机器学习模型文件
+│   │   │   └── model_loader.py # 实现模型的加载和管理，支持模型版本控制
+│   │   │
+│   │   ├── metrics/          # 性能指标监控，确保系统性能
+│   │   │   ├── performance.py # 实现性能监控，包括处理时间、资源使用等指标
+│   │   │   └── statistics.py  # 实现统计分析，包括数据分布、聚类效果等分析
+│   │   │
+│   │   ├── async_tasks/      # 异步处理基础设施，提供并发支持
+│   │   │   ├── thread_pool.py # 实现线程池管理，优化异步任务执行
+│   │   │   └── task_queue.py  # 实现任务队列管理，确保任务有序执行
+│   │   │
+│   │   └── common/           # 通用基础设施，提供基础支持
+│   │       ├── config.py     # 实现统一的配置管理，包括参数设置和环境配置
+│   │       ├── logging.py    # 实现统一的日志管理，支持多级别日志记录
+│   │       └── exceptions.py # 实现统一的异常处理，包括自定义异常和错误处理
+│   │
+│   └── interface/           # 接口层：处理用户界面和交互
+│       ├── dto_assembler/   # DTO转换器，处理数据转换
+│       │   ├── signal_assembler.py # 实现信号数据的DTO转换，处理数据格式转换
+│       │   └── result_assembler.py # 实现结果数据的DTO转换，处理显示格式转换
+│       │
+│       ├── event_handlers/  # 事件处理器，响应用户操作
+│       │   ├── signal_handlers.py # 处理信号相关事件
+│       │   └── result_handlers.py # 处理结果相关事件
+│       │
+│       ├── middleware/      # 中间件，处理通用逻辑
+│       │   ├── error_handler.py # 实现错误处理中间件
+│       │   └── loading_handler.py # 实现加载状态处理
+│       │
+│       ├── views/           # 视图，实现界面显示
+│       │   ├── main_view.py  # 实现主窗口视图，包括界面布局和交互逻辑
+│       │   └── view_controller.py # 实现视图控制器，协调UI组件和业务逻辑
+│       │
+│       ├── widgets/         # UI组件，提供界面元素
+│       │   ├── plot_widget.py # 实现绘图组件，支持多种数据可视化方式
+│       │   ├── loading_spinner.py # 实现加载动画组件，提供视觉反馈
+│       │   └── switch_widget.py # 实现开关组件，支持状态切换
+│       │
+│       ├── layout/          # 布局管理，控制界面结构
+│       │   └── main_layout.py # 实现主布局管理，确保界面布局的一致性
+│       │
+│       └── styles/          # 样式管理，控制界面外观
+│           ├── style_constants.py # 定义样式常量，确保界面风格的统一
+│           └── style_sheets.py # 实现样式表管理，支持主题切换
+│
+├── run.py                  # 项目启动脚本，负责初始化和启动应用
+└── requirements.txt        # 项目依赖文件，管理第三方库版本
+
+二、文件路径列表：
+
+0. 根目录文件
+RadarIdentifySystem/run.py                    # 项目启动脚本，负责应用程序的初始化和启动
+RadarIdentifySystem/requirements.txt          # 项目依赖文件，管理所有第三方库的版本
+
+1. 领域层 (Domain Layer) - 实现核心业务逻辑
+RadarIdentifySystem/radar_system/domain/signal/signal_type.py    # 定义雷达信号类型的枚举和分类标准
+RadarIdentifySystem/radar_system/domain/signal/validator.py      # 实现信号数据的验证规则和参数检查
+RadarIdentifySystem/radar_system/domain/signal/repository.py     # 定义信号数据的存取接口和访问规范
+RadarIdentifySystem/radar_system/domain/signal/signal.py         # 实现信号数据模型和基础处理功能
+RadarIdentifySystem/radar_system/domain/signal/slice.py          # 实现信号数据的切片和分组处理
+RadarIdentifySystem/radar_system/domain/signal/cluster.py        # 实现信号数据的聚类分析算法
+RadarIdentifySystem/radar_system/domain/recognition/feature.py   # 实现特征提取和预处理功能
+RadarIdentifySystem/radar_system/domain/recognition/predictor.py # 实现信号分类预测功能
+RadarIdentifySystem/radar_system/domain/recognition/validator.py # 实现特征和预测结果的验证
+RadarIdentifySystem/radar_system/domain/recognition/repository.py # 定义识别结果的存取接口
+
+2. 应用层 (Application Layer) - 协调业务流程
+RadarIdentifySystem/radar_system/application/dto/signal_dto.py   # 定义信号数据的传输对象
+RadarIdentifySystem/radar_system/application/dto/cluster_dto.py  # 定义聚类结果的传输对象
+RadarIdentifySystem/radar_system/application/dto/recognition_dto.py # 定义识别结果的传输对象
+RadarIdentifySystem/radar_system/application/events/signal_events.py # 定义信号处理相关事件
+RadarIdentifySystem/radar_system/application/events/cluster_events.py # 定义聚类分析相关事件
+RadarIdentifySystem/radar_system/application/events/recognition_events.py # 定义识别处理相关事件
+RadarIdentifySystem/radar_system/application/async_tasks/task_status.py # 实现任务状态管理
+RadarIdentifySystem/radar_system/application/async_tasks/signal_tasks.py # 实现信号处理异步任务
+RadarIdentifySystem/radar_system/application/async_tasks/cluster_tasks.py # 实现聚类分析异步任务
+RadarIdentifySystem/radar_system/application/async_tasks/recognition_tasks.py # 实现识别处理异步任务
+RadarIdentifySystem/radar_system/application/async_tasks/plot_tasks.py # 实现数据可视化异步任务
+RadarIdentifySystem/radar_system/application/async_tasks/save_tasks.py # 实现数据保存异步任务
+RadarIdentifySystem/radar_system/application/signal_service.py   # 实现信号处理服务
+RadarIdentifySystem/radar_system/application/cluster_service.py  # 实现聚类分析服务
+RadarIdentifySystem/radar_system/application/recognition_service.py # 实现识别处理服务
+
+3. 基础设施层 (Infrastructure Layer) - 提供技术支持
+RadarIdentifySystem/radar_system/infrastructure/cache/signal_cache.py # 实现信号数据缓存
+RadarIdentifySystem/radar_system/infrastructure/cache/result_cache.py # 实现处理结果缓存
+RadarIdentifySystem/radar_system/infrastructure/persistence/excel_reader.py # 实现Excel数据读取
+RadarIdentifySystem/radar_system/infrastructure/persistence/file_storage.py # 实现文件存储管理
+RadarIdentifySystem/radar_system/infrastructure/ml/model_loader.py # 实现机器学习模型加载
+RadarIdentifySystem/radar_system/infrastructure/metrics/performance.py # 实现性能监控
+RadarIdentifySystem/radar_system/infrastructure/metrics/statistics.py # 实现统计分析
+RadarIdentifySystem/radar_system/infrastructure/async_tasks/thread_pool.py # 实现线程池管理
+RadarIdentifySystem/radar_system/infrastructure/async_tasks/task_queue.py # 实现任务队列管理
+RadarIdentifySystem/radar_system/infrastructure/common/config.py # 实现配置管理
+RadarIdentifySystem/radar_system/infrastructure/common/logging.py # 实现日志管理
+RadarIdentifySystem/radar_system/infrastructure/common/exceptions.py # 实现异常处理
+
+4. 接口层 (Interface Layer) - 处理用户交互
+RadarIdentifySystem/radar_system/interface/dto_assembler/signal_assembler.py # 实现信号数据转换
+RadarIdentifySystem/radar_system/interface/dto_assembler/result_assembler.py # 实现结果数据转换
+RadarIdentifySystem/radar_system/interface/event_handlers/signal_handlers.py # 处理信号相关事件
+RadarIdentifySystem/radar_system/interface/event_handlers/result_handlers.py # 处理结果相关事件
+RadarIdentifySystem/radar_system/interface/middleware/error_handler.py # 实现错误处理中间件
+RadarIdentifySystem/radar_system/interface/middleware/loading_handler.py # 实现加载状态处理
+RadarIdentifySystem/radar_system/interface/views/main_view.py # 实现主窗口视图
+RadarIdentifySystem/radar_system/interface/views/view_controller.py # 实现视图控制器
+RadarIdentifySystem/radar_system/interface/widgets/plot_widget.py # 实现绘图组件
+RadarIdentifySystem/radar_system/interface/widgets/loading_spinner.py # 实现加载动画
+RadarIdentifySystem/radar_system/interface/widgets/switch_widget.py # 实现开关组件
+RadarIdentifySystem/radar_system/interface/layout/main_layout.py # 实现主布局管理
+RadarIdentifySystem/radar_system/interface/styles/style_constants.py # 定义样式常量
+RadarIdentifySystem/radar_system/interface/styles/style_sheets.py # 实现样式表管理
+
+注意事项：
+1. 所有Python文件都应使用UTF-8编码
+2. 保持清晰的分层架构
+3. 遵循依赖倒置原则
+4. 确保模块间的低耦合高内聚
+5. 代码迁移时应保持功能的完整性
+6. 注意处理模块间的依赖关系 
+
+三、功能说明：
+
+1. 领域层 (Domain Layer)
+   a) signal包
+   - signal_type.py: 定义雷达信号类型枚举，包括X波段、C波段等信号类型的分类标准
+   - validator.py: 验证信号数据的有效性，包括频率范围、脉宽范围、幅度范围等参数验证
+   - repository.py: 定义信号数据存取接口，规范化数据访问方式
+   - signal.py: 实现信号数据模型和基础处理，包括信号参数提取、数据清洗等
+   - slice.py: 实现信号切片处理，包括时间窗口划分、数据分组等
+   - cluster.py: 实现信号聚类分析，包括DBSCAN聚类、参数自适应等功能
+
+   b) recognition包
+   - feature.py: 实现特征提取器，包括CF、PW、DOA等特征的提取和预处理
+   - predictor.py: 实现预测器，包括PA和DTOA的分类预测
+   - validator.py: 验证特征和预测结果，确保结果的可靠性
+   - repository.py: 定义识别结果的存取接口，规范化结果数据的访问
+
+2. 应用层 (Application Layer)
+   a) dto包
+   - signal_dto.py: 定义信号数据传输对象，用于层间数据传递
+   - cluster_dto.py: 定义聚类结果传输对象，包括聚类参数和结果
+   - recognition_dto.py: 定义识别结果传输对象，包括预测结果和置信度
+
+   b) events包
+   - signal_events.py: 定义信号处理相关事件，如数据加载、预处理完成等
+   - cluster_events.py: 定义聚类相关事件，如聚类开始、完成等
+   - recognition_events.py: 定义识别相关事件，如识别开始、完成等
+
+   c) async_tasks包
+   - task_status.py: 管理任务状态，包括进度追踪和状态更新
+   - signal_tasks.py: 处理信号相关的异步任务，如数据加载和预处理
+   - cluster_tasks.py: 处理聚类相关的异步任务，包括参数优化和结果验证
+   - recognition_tasks.py: 处理识别相关的异步任务，包括模型预测和结果整合
+   - plot_tasks.py: 处理绘图相关的异步任务，包括实时显示和结果可视化
+   - save_tasks.py: 处理保存相关的异步任务，包括数据导出和结果保存
+
+   d) 服务类
+   - signal_service.py: 协调信号处理流程，包括数据加载、预处理等
+   - cluster_service.py: 协调聚类分析流程，包括参数设置、结果验证等
+   - recognition_service.py: 协调识别流程，包括特征提取、模型预测等
+
+3. 基础设施层 (Infrastructure Layer)
+   a) cache包
+   - signal_cache.py: 实现信号数据的缓存管理，优化数据访问性能
+   - result_cache.py: 实现处理结果的缓存管理，减少重复计算
+
+   b) persistence包
+   - excel_reader.py: 实现Excel数据的读取和解析，支持多种数据格式
+   - file_storage.py: 实现文件存储管理，包括临时文件和结果文件的处理
+
+   c) ml包
+   - models/: 存放训练好的机器学习模型文件
+   - model_loader.py: 实现模型的加载和管理，支持模型版本控制
+
+   d) metrics包
+   - performance.py: 实现性能监控，包括处理时间、资源使用等指标
+   - statistics.py: 实现统计分析，包括数据分布、聚类效果等分析
+
+   e) async_tasks包
+   - thread_pool.py: 实现线程池管理，优化异步任务执行
+   - task_queue.py: 实现任务队列管理，确保任务有序执行
+
+   f) common包
+   - config.py: 实现统一的配置管理，包括参数设置和环境配置
+   - logging.py: 实现统一的日志管理，支持多级别日志记录
+   - exceptions.py: 实现统一的异常处理，包括自定义异常和错误处理
+
+4. 接口层 (Interface Layer)
+   a) dto_assembler包
+   - signal_assembler.py: 实现信号数据的DTO转换，处理数据格式转换
+   - result_assembler.py: 实现结果数据的DTO转换，处理显示格式转换
+
+   b) event_handlers包
+   - signal_handlers.py: 处理信号相关的UI事件，如数据加载响应
+   - result_handlers.py: 处理结果相关的UI事件，如显示更新响应
+
+   c) middleware包
+   - error_handler.py: 实现UI层的错误处理，提供友好的错误提示
+   - loading_handler.py: 实现加载状态处理，提供进度反馈
+
+   d) views包
+   - main_view.py: 实现主窗口视图，包括界面布局和交互逻辑
+   - view_controller.py: 实现视图控制器，协调UI组件和业务逻辑
+
+   e) widgets包
+   - plot_widget.py: 实现绘图组件，支持多种数据可视化方式
+   - loading_spinner.py: 实现加载动画组件，提供视觉反馈
+   - switch_widget.py: 实现开关组件，支持状态切换
+
+   f) layout包
+   - main_layout.py: 实现主布局管理，确保界面布局的一致性
+
+   g) styles包
+   - style_constants.py: 定义样式常量，确保界面风格的统一
+   - style_sheets.py: 实现样式表管理，支持主题切换
+
+5. 根目录文件
+   - run.py: 项目启动脚本，负责初始化和启动应用
+   - requirements.txt: 项目依赖文件，管理第三方库版本 

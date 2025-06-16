@@ -1,0 +1,22 @@
+# 忽略所有日志文件
+*.log
+log/
+logs/
+
+# 忽略Python缓存文件
+__pycache__/
+tmp/
+temp/
+
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+*.xlsx
+
+.idea/
+.vscode/
+dist/
+build/
+.spec

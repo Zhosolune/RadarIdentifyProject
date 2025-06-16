@@ -1,0 +1,156 @@
+一、项目树状结构：
+
+RadarIdentifySystem/                # 项目根目录
+├── radar_system/                  # 主要代码目录，包含所有核心功能实现
+│   ├── domain/                   # 领域层：实现核心业务逻辑和领域规则
+│   │   ├── signal/              # 信号处理领域，负责信号数据的处理和分析
+│   │   │   ├── entities/       # 信号领域实体
+│   │   │   │   ├── signal.py  # 信号数据实体定义
+│   │   │   │   └── signal_type.py # 信号类型枚举定义
+│   │   │   │
+│   │   │   ├── services/      # 信号领域服务
+│   │   │   │   ├── processor.py # 信号处理服务实现
+│   │   │   │   └── validator.py # 信号验证服务实现
+│   │   │   │
+│   │   │   └── repositories/  # 信号数据仓储
+│   │   │       └── signal_repository.py # 信号数据访问接口实现
+│   │   │
+│   │   └── recognition/        # 识别处理领域，负责特征提取和模式识别
+│   │       ├── entities/       # 识别领域实体
+│   │       │   ├── feature.py # 特征数据实体定义
+│   │       │   └── result.py  # 识别结果实体定义
+│   │       │
+│   │       ├── services/      # 识别领域服务
+│   │       │   ├── classifier.py # 分类器服务实现
+│   │       │   └── evaluator.py # 评估服务实现
+│   │       │
+│   │       └── repositories/  # 识别结果仓储
+│   │           └── result_repository.py # 结果数据访问接口实现
+│   │
+│   ├── application/             # 应用层：协调业务流程
+│   │   ├── services/           # 应用服务
+│   │   │   ├── signal_service.py # 信号处理应用服务
+│   │   │   └── recognition_service.py # 识别处理应用服务
+│   │   │
+│   │   ├── tasks/             # 异步任务定义
+│   │   │   ├── task_manager.py # 任务管理器
+│   │   │   ├── signal_tasks.py # 信号处理任务
+│   │   │   ├── recognition_tasks.py # 识别处理任务
+│   │   │   └── visualization_tasks.py # 可视化任务
+│   │   │
+│   │   └── events/            # 应用事件定义
+│   │       ├── signal_events.py # 信号处理事件
+│   │       └── recognition_events.py # 识别处理事件
+│   │
+│   ├── infrastructure/         # 基础设施层：提供技术支持
+│   │   ├── async/             # 异步处理基础设施
+│   │   │   ├── thread_pool/  # 线程池实现
+│   │   │   │   ├── pool.py  # 线程池核心实现
+│   │   │   │   ├── worker.py # 工作线程实现
+│   │   │   │   └── task_queue.py # 任务队列实现
+│   │   │   │
+│   │   │   ├── event_bus/   # 事件总线实现
+│   │   │   │   ├── event_bus.py # 事件总线核心
+│   │   │   │   └── dispatcher.py # 事件分发器
+│   │   │   │
+│   │   │   └── schedulers/  # 任务调度器
+│   │   │       ├── base.py  # 基础调度器接口
+│   │   │       ├── priority.py # 优先级调度器
+│   │   │       └── round_robin.py # 轮询调度器
+│   │   │
+│   │   ├── persistence/       # 持久化管理
+│   │   │   ├── excel/        # Excel数据处理
+│   │   │   │   ├── reader.py # Excel读取器
+│   │   │   │   └── writer.py # Excel写入器
+│   │   │   │
+│   │   │   └── file/        # 文件处理
+│   │   │       └── file_manager.py # 文件管理器
+│   │   │
+│   │   ├── ml/               # 机器学习基础设施
+│   │   │   ├── models/      # 模型文件目录
+│   │   │   └── model_loader.py # 模型加载器
+│   │   │
+│   │   └── common/           # 通用基础设施
+│   │       ├── logging.py   # 日志管理
+│   │       ├── config.py    # 配置管理
+│   │       └── exceptions.py # 异常处理
+│   │
+│   ├── interface/             # 接口层：处理用户界面和交互
+│   │   ├── views/            # 视图实现
+│   │   │   ├── main_window.py # 主窗口实现
+│   │   │   └── components/  # UI组件
+│   │   │       ├── plot_widget.py # 绘图组件
+│   │   │       └── loading_spinner.py # 加载动画组件
+│   │   │       └── switch_widget.py      # 开关组件
+│   │   │
+│   │   ├── layouts/         # 布局管理
+│   │   │   └── main_layout.py # 主布局实现
+│   │   │
+│   │   ├── styles/          # 样式管理
+│   │   │   └── style_sheets.py # 样式定义
+│   │   │
+│   │   └── handlers/       # 事件处理
+│   │       └── ui_handlers.py # UI事件处理器
+│   │
+│   └── app.py             # 程序入口
+│
+├── logs/                    # 日志目录
+├── config/                  # 配置文件目录
+├── requirements.txt         # 项目依赖文件
+├── README.md               # 项目说明文档
+└── run.py                  # 项目启动脚本
+
+二、文件路径列表：
+
+0. 根目录文件
+RadarIdentifySystem/main.py                 # 项目启动脚本，负责应用程序的初始化和启动
+RadarIdentifySystem/requirements.txt        # 项目依赖文件，管理所有第三方库的版本
+RadarIdentifySystem/README.md              # 项目说明文档，包含项目概述和使用说明
+
+1. 领域层 (Domain Layer)
+RadarIdentifySystem/radar_system/domain/signal/entities/signal.py          # 信号数据实体定义
+RadarIdentifySystem/radar_system/domain/signal/entities/signal_type.py     # 信号类型枚举定义
+RadarIdentifySystem/radar_system/domain/signal/services/processor.py       # 信号处理服务实现
+RadarIdentifySystem/radar_system/domain/signal/services/validator.py       # 信号验证服务实现
+RadarIdentifySystem/radar_system/domain/signal/repositories/signal_repository.py  # 信号数据访问接口实现
+RadarIdentifySystem/radar_system/domain/recognition/entities/feature.py    # 特征数据实体定义
+RadarIdentifySystem/radar_system/domain/recognition/entities/result.py     # 识别结果实体定义
+RadarIdentifySystem/radar_system/domain/recognition/services/classifier.py # 分类器服务实现
+RadarIdentifySystem/radar_system/domain/recognition/services/evaluator.py  # 评估服务实现
+RadarIdentifySystem/radar_system/domain/recognition/repositories/result_repository.py # 结果数据访问接口实现
+
+2. 应用层 (Application Layer)
+RadarIdentifySystem/radar_system/application/services/signal_service.py    # 信号处理应用服务
+RadarIdentifySystem/radar_system/application/services/recognition_service.py # 识别处理应用服务
+RadarIdentifySystem/radar_system/application/tasks/task_manager.py        # 任务管理器
+RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py        # 信号处理任务
+RadarIdentifySystem/radar_system/application/tasks/recognition_tasks.py   # 识别处理任务
+RadarIdentifySystem/radar_system/application/tasks/visualization_tasks.py # 可视化任务
+RadarIdentifySystem/radar_system/application/events/signal_events.py      # 信号处理事件
+RadarIdentifySystem/radar_system/application/events/recognition_events.py # 识别处理事件
+
+3. 基础设施层 (Infrastructure Layer)
+RadarIdentifySystem/radar_system/infrastructure/async/thread_pool/pool.py # 线程池核心实现
+RadarIdentifySystem/radar_system/infrastructure/async/thread_pool/worker.py # 工作线程实现
+RadarIdentifySystem/radar_system/infrastructure/async/thread_pool/task_queue.py # 任务队列实现
+RadarIdentifySystem/radar_system/infrastructure/async/event_bus/event_bus.py # 事件总线核心
+RadarIdentifySystem/radar_system/infrastructure/async/event_bus/dispatcher.py # 事件分发器
+RadarIdentifySystem/radar_system/infrastructure/async/schedulers/base.py # 基础调度器接口
+RadarIdentifySystem/radar_system/infrastructure/async/schedulers/priority.py # 优先级调度器
+RadarIdentifySystem/radar_system/infrastructure/async/schedulers/round_robin.py # 轮询调度器
+RadarIdentifySystem/radar_system/infrastructure/persistence/excel/reader.py # Excel读取器
+RadarIdentifySystem/radar_system/infrastructure/persistence/excel/writer.py # Excel写入器
+RadarIdentifySystem/radar_system/infrastructure/persistence/file/file_manager.py # 文件管理器
+RadarIdentifySystem/radar_system/infrastructure/ml/model_loader.py # 模型加载器
+RadarIdentifySystem/radar_system/infrastructure/common/logging.py # 日志管理
+RadarIdentifySystem/radar_system/infrastructure/common/config.py # 配置管理
+RadarIdentifySystem/radar_system/infrastructure/common/exceptions.py # 异常处理
+
+4. 接口层 (Interface Layer)
+RadarIdentifySystem/radar_system/interface/views/main_window.py # 主窗口实现
+RadarIdentifySystem/radar_system/interface/views/components/plot_widget.py # 绘图组件
+RadarIdentifySystem/radar_system/interface/views/components/loading_spinner.py # 加载动画组件
+RadarIdentifySystem/radar_system/interface/views/components/switch_widget.py # 开关组件
+RadarIdentifySystem/radar_system/interface/layouts/main_layout.py # 主布局实现
+RadarIdentifySystem/radar_system/interface/styles/style_sheets.py # 样式定义
+RadarIdentifySystem/radar_system/interface/handlers/ui_handlers.py # UI事件处理器

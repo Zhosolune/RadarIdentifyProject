@@ -1,0 +1,186 @@
+- 项目简介
+    原项目是一个雷达信号处理与智能识别系统，包含数据导入、数据处理、数据切片、聚类分析、智能识别、结果可视化、参数提取等功能。并为用户提供丰富的交互界面，用户可以自定义聚类和识别的参数，并按需查看识别结果。
+    本项目致力于将不完善的旧项目进行重构，以下文的项目结构，规范的、完整的将旧项目迁移到新项目。
+
+- 项目技术栈
+    - 语言：Python
+    - 框架：PyQt5
+    - 数据处理：numpy、pandas
+    - 机器学习：scikit-learn
+    - 可视化：matplotlib
+
+- 项目参考
+    - 迁移手册.md
+- 项目开发手册
+    - docs/development_guide.md
+- 项目知识库
+    - 知识库.md
+
+- 原项目代码文件
+    - project/
+
+- 新项目代码文件
+    - RadarIdentifySystem/
+
+- 任务开展流程：
+    -分析迁移手册与开发手册相关部分的说明->根据说明明确旧项目迁移到新项目的处理策略->
+     阅读知识库，查找需要用到的已经存在的基础设施，并使用正确的调用方式->
+     实现目标模块，完成代码->将新模块以规定结构整理到知识库中
+
+- 项目结构
+        
+    0. 根目录文件
+    RadarIdentifySystem/run.py                 # 项目启动脚本，负责应用程序的初始化和启动
+    RadarIdentifySystem/requirements.txt        # 项目依赖文件，管理所有第三方库的版本
+    RadarIdentifySystem/README.md              # 项目说明文档，包含项目概述和使用说明
+
+    1. 领域层 (Domain Layer)
+    RadarIdentifySystem/radar_system/domain/signal/entities/signal.py          # 信号数据实体定义
+    RadarIdentifySystem/radar_system/domain/signal/entities/signal_type.py     # 信号类型枚举定义
+    RadarIdentifySystem/radar_system/domain/signal/services/processor.py       # 信号处理服务实现
+    RadarIdentifySystem/radar_system/domain/signal/services/validator.py       # 信号验证服务实现
+    RadarIdentifySystem/radar_system/domain/signal/repositories/signal_repository.py  # 信号数据访问接口实现
+    RadarIdentifySystem/radar_system/domain/recognition/entities/feature.py    # 特征数据实体定义
+    RadarIdentifySystem/radar_system/domain/recognition/entities/result.py     # 识别结果实体定义
+    RadarIdentifySystem/radar_system/domain/recognition/services/classifier.py # 分类器服务实现
+    RadarIdentifySystem/radar_system/domain/recognition/services/evaluator.py  # 评估服务实现
+    RadarIdentifySystem/radar_system/domain/recognition/repositories/result_repository.py # 结果数据访问接口实现
+
+    2. 应用层 (Application Layer)
+    RadarIdentifySystem/radar_system/application/services/signal_service.py    # 信号处理应用服务
+    RadarIdentifySystem/radar_system/application/services/recognition_service.py # 识别处理应用服务
+    RadarIdentifySystem/radar_system/application/tasks/task_manager.py        # 任务管理器
+    RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py        # 信号处理任务
+    RadarIdentifySystem/radar_system/application/tasks/recognition_tasks.py   # 识别处理任务
+    RadarIdentifySystem/radar_system/application/tasks/visualization_tasks.py # 可视化任务
+    RadarIdentifySystem/radar_system/application/events/signal_events.py      # 信号处理事件
+    RadarIdentifySystem/radar_system/application/events/recognition_events.py # 识别处理事件
+
+    3. 基础设施层 (Infrastructure Layer)
+    RadarIdentifySystem/radar_system/infrastructure/async/thread_pool/pool.py # 线程池核心实现
+    RadarIdentifySystem/radar_system/infrastructure/async/thread_pool/worker.py # 工作线程实现
+    RadarIdentifySystem/radar_system/infrastructure/async/thread_pool/task_queue.py # 任务队列实现
+    RadarIdentifySystem/radar_system/infrastructure/async/event_bus/event_bus.py # 事件总线核心
+    RadarIdentifySystem/radar_system/infrastructure/async/event_bus/dispatcher.py # 事件分发器
+    RadarIdentifySystem/radar_system/infrastructure/async/schedulers/base.py # 基础调度器接口
+    RadarIdentifySystem/radar_system/infrastructure/async/schedulers/priority.py # 优先级调度器
+    RadarIdentifySystem/radar_system/infrastructure/async/schedulers/round_robin.py # 轮询调度器
+    RadarIdentifySystem/radar_system/infrastructure/persistence/excel/reader.py # Excel读取器
+    RadarIdentifySystem/radar_system/infrastructure/persistence/excel/writer.py # Excel写入器
+    RadarIdentifySystem/radar_system/infrastructure/persistence/file/file_manager.py # 文件管理器
+    RadarIdentifySystem/radar_system/infrastructure/ml/model_loader.py # 模型加载器
+    RadarIdentifySystem/radar_system/infrastructure/common/logging.py # 日志管理
+    RadarIdentifySystem/radar_system/infrastructure/common/config.py # 配置管理
+    RadarIdentifySystem/radar_system/infrastructure/common/exceptions.py # 异常处理
+
+    4. 接口层 (Interface Layer)
+    RadarIdentifySystem/radar_system/interface/views/main_window.py # 主窗口实现
+    RadarIdentifySystem/radar_system/interface/views/components/plot_widget.py # 绘图组件
+    RadarIdentifySystem/radar_system/interface/views/components/loading_spinner.py # 加载动画组件
+    RadarIdentifySystem/radar_system/interface/views/components/switch_widget.py # 开关组件
+    RadarIdentifySystem/radar_system/interface/layouts/main_layout.py # 主布局实现
+    RadarIdentifySystem/radar_system/interface/styles/style_sheets.py # 样式定义
+    RadarIdentifySystem/radar_system/interface/handlers/ui_handlers.py # UI事件处理器
+
+    5. 程序入口
+    RadarIdentifySystem/radar_system/app.py # 系统入口点，负责初始化和启动应用
+    
+- 功能说明：
+
+    1. 领域层 (Domain Layer)
+        a) signal包
+        - entities/signal.py: 定义信号数据实体，包含原始数据和切片数据的结构
+        - entities/signal_type.py: 定义信号类型枚举，包括波段类型等
+        - services/processor.py: 实现信号处理服务，包括数据验证、切片处理等
+        - services/validator.py: 实现信号验证服务，确保数据的有效性
+        - repositories/signal_repository.py: 实现信号数据的存取接口
+
+        b) recognition包
+        - entities/feature.py: 定义特征数据实体，包含PA和DTOA特征
+        - entities/result.py: 定义识别结果实体，包含识别标签和置信度
+        - services/classifier.py: 实现分类器服务，处理图像识别
+        - services/evaluator.py: 实现评估服务，评估识别结果
+        - repositories/result_repository.py: 实现识别结果的存取接口
+
+    2. 应用层 (Application Layer)
+        a) services包
+        - signal_service.py: 协调信号处理流程，包括数据加载、预处理等
+        - recognition_service.py: 协调识别流程，包括特征提取、模型预测等
+
+        b) tasks包
+        - task_manager.py: 管理异步任务的执行和调度
+        - signal_tasks.py: 处理信号相关的异步任务
+        - recognition_tasks.py: 处理识别相关的异步任务
+        - visualization_tasks.py: 处理可视化相关的异步任务
+
+        c) events包
+        - signal_events.py: 定义信号处理相关事件
+        - recognition_events.py: 定义识别处理相关事件
+
+    3. 基础设施层 (Infrastructure Layer)
+        a) async包
+        - thread_pool/: 实现线程池管理，优化异步任务执行
+        - event_bus/: 实现事件总线，处理系统事件
+        - schedulers/: 实现任务调度器，管理任务执行顺序
+
+        b) persistence包
+        - excel/: 实现Excel数据的读写功能
+        - file/: 实现文件系统的管理功能
+
+        c) ml包
+        - model_loader.py: 实现机器学习模型的加载和管理
+
+        d) common包
+        - logging.py: 实现日志管理功能
+        - config.py: 实现配置管理功能
+        - exceptions.py: 实现异常处理功能
+
+    4. 接口层 (Interface Layer)
+        a) views包
+        - main_window.py: 实现主窗口界面
+        - components/: 实现各种UI组件
+
+        b) controllers包
+        - main_controller.py: 实现主控制器
+        - signal_controller.py: 实现信号控制器
+        - recognition_controller.py: 实现识别控制器
+
+        c) layouts包
+        - main_layout.py: 实现主界面布局
+
+        d) handlers包
+        - ui_handlers.py: 实现UI事件处理 
+
+- 编码规范
+    1. 所有Python文件都应使用UTF-8编码
+    2. 对于Python语言：
+        - 编写方法时，需要注明函数的形参及其类型、用"->"符号注明返回值及其类型
+        - 对于每一个方法或类，编写Google风格的注释文档，文档包含：功能介绍、输入参数说明、返回值说明、异常抛出说明
+        - 使用绝对导入，不要使用相对导入
+    3. No emoji expression !
+    4. 不要生成乱码字符
+    5. 不要生成"�"字符
+    6. 涉及到命令行语句时，使用Windows系统环境下的PowerShell语法
+    7. 你的代码都应该是有迹可循、有理可依的，不允许调用不存在的目录或文件
+
+- 额外任务
+    在项目重构工作开始时，你需要建立一个唯一的、规范的、宏观的文档，你需要在该文档中记录项目重构过程中创建的所有类、属性、方法、接口等，将它们按照层级结构与实现的功能，完整、详细的记录下来。
+    该文档需要体现：
+        - 实体的宏观结构
+        - 每个功能涉及的代码文件、类、属性与方法
+        - 功能实现过程中方法的调用、依赖关系、接口
+        - 功能实现过程中的数据流
+        - 不同功能之间的调用关系
+        - 不同功能之间的数据流
+        - 不同功能之间的依赖关系
+    注意：
+        - 你的记录必须依托于实际发生的变动，不能凭空想象，不能凭空捏造，只有当其真正创建并使用时，你才能记录它
+    重要！！！
+        - 你的每一次思考都要受到该文件的指导！
+        - 你的每一次思考都要受到该文件的指导！！
+        - 你的每一次思考都要受到该文件的指导！！！
+        - 你需要随着重构工作的展开，不断完善、学习该文档，并根据实际情况，不断调整、优化该文档，这对重构工作至关重要！
+    该文档命名为：“知识库.md”，位于项目根目录下。
+    
+
+
