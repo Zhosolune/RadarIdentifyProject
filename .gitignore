@@ -21,4 +21,5 @@ dist/
 build/
 .spec
 
-.zip
+# 忽略压缩文件
+*.zip
