@@ -103,15 +103,15 @@
                 }
             }
         ],
-        "temp_dir": "F:\\MyWorkspace\\BaiduSyncdisk\\M-PY-Cluster\\RadarIdentifyProject\\RadarIdentifySystem\\temp",
-        "save_dir": "F:\\MyWorkspace\\BaiduSyncdisk\\M-PY-Cluster\\RadarIdentifyProject\\RadarIdentifySystem\\result"
+        "temp_dir": "E:\\myProjects\\RadarIdentifyProject\\RadarIdentifySystem\\temp",
+        "save_dir": "E:\\myProjects\\RadarIdentifyProject\\RadarIdentifySystem\\result"
     },
     "ui": {
         "window_x": 1200,
         "window_y": 800,
         "window_width": null,
         "window_height": null,
-        "last_import_dir": "F:\\MyWorkspace\\BaiduSyncdisk\\Part_timeJob\\240817\\c",
+        "last_import_dir": "E:\\myProjects\\RadarIdentifyProject",
         "remember_window_position": false
     }
 }

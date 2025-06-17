@@ -17,7 +17,6 @@ from radar_system.infrastructure.common.logging import system_logger
 from radar_system.infrastructure.async_core.event_bus.event_bus import EventBus
 from radar_system.infrastructure.common.config import ConfigManager
 from radar_system.infrastructure.async_core.thread_pool.pool import ThreadPool
-from radar_system.infrastructure.async_core.event_bus.event import Event
 
 class SignalService:
     """信号处理服务
@@ -96,10 +95,10 @@ class SignalService:
         """
         try:
             # 发布开始加载事件
-            self.event_bus.publish(Event(
-                type="signal_loading_started",
-                data={"file_path": file_path}
-            ))
+            self.event_bus.publish(
+                "signal_loading_started",
+                {"file_path": file_path}
+            )
             
             # 读取Excel文件
             success, raw_data, message = self.excel_reader.read_radar_data(file_path)
@@ -120,13 +119,13 @@ class SignalService:
             # 验证数据
             valid, message = self.validator.validate_signal(signal)
             if not valid:
-                self.event_bus.publish(Event(
-                    type="signal_validation_failed",
-                    data={
+                self.event_bus.publish(
+                    "signal_validation_failed",
+                    {
                         "file_path": file_path,
                         "error": message
                     }
-                ))
+                )
                 return False, message, None
             
             # 保存当前信号数据
@@ -134,28 +133,28 @@ class SignalService:
             self.repository.save(signal)
             
             # 发布加载完成事件
-            self.event_bus.publish(Event(
-                type="signal_loading_completed",
-                data={
+            self.event_bus.publish(
+                "signal_loading_completed",
+                {
                     "signal_id": signal.id,
                     "data_count": signal.data_count,
                     "band_type": signal.band_type,
                     "expected_slices": signal.expected_slices
                 }
-            ))
+            )
             
             return True, "数据加载成功", signal
             
         except Exception as e:
             error_msg = f"加载信号数据出错: {str(e)}"
             system_logger.error(error_msg)
-            self.event_bus.publish(Event(
-                type="signal_loading_failed",
-                data={
+            self.event_bus.publish(
+                "signal_loading_failed",
+                {
                     "file_path": file_path,
                     "error": error_msg
                 }
-            ))
+            )
             return False, error_msg, None
             
     def start_slice_processing(self, signal: SignalData) -> Tuple[bool, str, Optional[List[SignalSlice]]]:
@@ -171,10 +170,10 @@ class SignalService:
         """
         try:
             # 发布开始切片事件
-            self.event_bus.publish(Event(
-                type="slice_processing_started",
-                data={"signal_id": signal.id}
-            ))
+            self.event_bus.publish(
+                "slice_processing_started",
+                {"signal_id": signal.id}
+            )
             
             # 执行切片
             slices = self.processor.slice_signal(signal)
@@ -185,26 +184,26 @@ class SignalService:
             self.current_slices = slices
             
             # 发布切片完成事件
-            self.event_bus.publish(Event(
-                type="slice_processing_completed",
-                data={
+            self.event_bus.publish(
+                "slice_processing_completed",
+                {
                     "signal_id": signal.id,
                     "slice_count": len(slices)
                 }
-            ))
+            )
             
             return True, "切片处理完成", slices
             
         except Exception as e:
             error_msg = f"切片处理出错: {str(e)}"
             system_logger.error(error_msg)
-            self.event_bus.publish(Event(
-                type="slice_processing_failed",
-                data={
+            self.event_bus.publish(
+                "slice_processing_failed",
+                {
                     "signal_id": signal.id,
                     "error": error_msg
                 }
-            ))
+            )
             return False, error_msg, None
             
     def get_current_signal(self) -> Optional[SignalData]:

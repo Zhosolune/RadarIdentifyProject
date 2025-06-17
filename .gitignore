@@ -21,4 +21,5 @@ dist/
 build/
 .spec
 
-.zip
+*.zip
+*.png

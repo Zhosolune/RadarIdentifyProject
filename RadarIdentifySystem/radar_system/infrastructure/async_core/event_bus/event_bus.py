@@ -1,28 +1,28 @@
 """事件总线模块
 
-本模块实现了事件总线的核心功能，提供事件的发布-订阅机制。
+本模块实现了事件总线的核心功能，提供简化版的事件发布-订阅机制。
 """
-from typing import Dict, List, Callable, Any, Optional
-from threading import Lock
-from radar_system.infrastructure.async_core.event_bus.event import Event
+from typing import Dict, List, Callable, Any
+import threading
 from radar_system.infrastructure.common.logging import system_logger
 
-EventHandler = Callable[[Event], None]
+# 定义事件处理器类型：接收事件数据作为参数的可调用对象
+EventHandler = Callable[[Any], None]
 
 class EventBus:
     """事件总线
     
-    提供事件的发布-订阅功能，支持异步事件处理。
+    提供事件的发布-订阅功能，支持同步和异步事件处理。
     
     Attributes:
         _handlers (Dict[str, List[EventHandler]]): 事件处理器映射
-        _lock (Lock): 线程安全锁
+        _lock (threading.Lock): 线程安全锁
     """
     
     def __init__(self):
         """初始化事件总线"""
         self._handlers: Dict[str, List[EventHandler]] = {}
-        self._lock = Lock()
+        self._lock = threading.Lock()
     
     def subscribe(self, event_type: str, handler: EventHandler) -> None:
         """订阅事件
@@ -66,26 +66,45 @@ class EventBus:
                 if not self._handlers[event_type]:
                     del self._handlers[event_type]
     
-    def publish(self, event: Event) -> None:
+    def publish(self, event_type: str, data: Any = None) -> None:
         """发布事件
         
         Args:
-            event: 要发布的事件
+            event_type: 事件类型
+            data: 事件数据（可选）
             
         Raises:
-            ValueError: 事件为None时抛出
+            ValueError: 事件类型为空时抛出
         """
-        if event is None:
-            raise ValueError("事件不能为None")
+        if not event_type:
+            raise ValueError("事件类型不能为空")
             
-        system_logger.debug(f"发布事件: {event.type}")
+        system_logger.debug(f"发布事件: {event_type}")
         
-        handlers = self._get_handlers(event.type)
+        handlers = self._get_handlers(event_type)
         for handler in handlers:
             try:
-                handler(event)
+                handler(data)
             except Exception as e:
                 system_logger.error(f"事件处理器异常: {str(e)}")
+    
+    def publish_async(self, event_type: str, data: Any = None) -> None:
+        """异步发布事件
+        
+        使用线程来异步处理事件
+        
+        Args:
+            event_type: 事件类型
+            data: 事件数据（可选）
+        """
+        if not event_type:
+            raise ValueError("事件类型不能为空")
+            
+        threading.Thread(
+            target=self.publish,
+            args=(event_type, data),
+            daemon=True
+        ).start()
     
     def _get_handlers(self, event_type: str) -> List[EventHandler]:
         """获取事件处理器列表

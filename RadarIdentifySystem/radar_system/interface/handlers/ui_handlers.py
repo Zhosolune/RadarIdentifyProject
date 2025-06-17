@@ -2,7 +2,7 @@
 
 本模块实现了与UI交互相关的事件处理器。
 """
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QApplication
@@ -42,6 +42,48 @@ class SignalImportHandler(QObject):
         super().__init__()
         self.event_bus = event_bus
         self._last_directory = None  # 会话级路径记忆
+        
+        # 订阅事件总线事件
+        self.event_bus.subscribe("import_task_started", self._on_import_task_started)
+        self.event_bus.subscribe("import_task_completed", self._on_import_task_completed)
+        self.event_bus.subscribe("import_task_failed", self._on_import_task_failed)
+        self.event_bus.subscribe("signal_loading_started", self._on_signal_loading_started)
+        self.event_bus.subscribe("signal_loading_completed", self._on_signal_loading_completed)
+        self.event_bus.subscribe("signal_loading_failed", self._on_signal_loading_failed)
+        self.event_bus.subscribe("signal_validation_failed", self._on_signal_validation_failed)
+        
+    def _on_import_task_started(self, data: Dict[str, Any]) -> None:
+        """处理导入任务开始事件"""
+        ui_logger.debug(f"导入任务开始: {data.get('file_path', '')}")
+        self.import_started.emit()
+        
+    def _on_import_task_completed(self, data: Dict[str, Any]) -> None:
+        """处理导入任务完成事件"""
+        ui_logger.debug(f"导入任务完成: {data}")
+        
+    def _on_import_task_failed(self, data: Dict[str, Any]) -> None:
+        """处理导入任务失败事件"""
+        error_msg = data.get("error", "未知错误")
+        ui_logger.error(f"导入任务失败: {error_msg}")
+        self.import_error.emit(error_msg)
+        
+    def _on_signal_loading_started(self, data: Dict[str, Any]) -> None:
+        """处理信号加载开始事件"""
+        ui_logger.debug(f"信号加载开始: {data.get('file_path', '')}")
+        
+    def _on_signal_loading_completed(self, data: Dict[str, Any]) -> None:
+        """处理信号加载完成事件"""
+        ui_logger.debug(f"信号加载完成: {data}")
+        
+    def _on_signal_loading_failed(self, data: Dict[str, Any]) -> None:
+        """处理信号加载失败事件"""
+        error_msg = data.get("error", "未知错误")
+        ui_logger.error(f"信号加载失败: {error_msg}")
+        
+    def _on_signal_validation_failed(self, data: Dict[str, Any]) -> None:
+        """处理信号验证失败事件"""
+        error_msg = data.get("error", "未知错误")
+        ui_logger.error(f"信号验证失败: {error_msg}")
         
     def browse_file(self, window) -> None:
         """处理浏览文件事件
@@ -118,7 +160,6 @@ class SignalImportHandler(QObject):
             ui_logger.error(error_msg)
             QMessageBox.critical(window, "错误", error_msg)
             self.import_error.emit(error_msg)
-            self.import_finished.emit(False)
             
     def _handle_import_result(self, future, window) -> None:
         """处理导入任务的执行结果
@@ -194,6 +235,42 @@ class SignalSliceHandler(QObject):
         self.current_slice_index = -1
         self.slices = None
         
+        # 订阅事件总线事件
+        self.event_bus.subscribe("slice_task_started", self._on_slice_task_started)
+        self.event_bus.subscribe("slice_task_completed", self._on_slice_task_completed)
+        self.event_bus.subscribe("slice_task_failed", self._on_slice_task_failed)
+        self.event_bus.subscribe("slice_processing_started", self._on_slice_processing_started)
+        self.event_bus.subscribe("slice_processing_completed", self._on_slice_processing_completed)
+        self.event_bus.subscribe("slice_processing_failed", self._on_slice_processing_failed)
+        
+    def _on_slice_task_started(self, data: Dict[str, Any]) -> None:
+        """处理切片任务开始事件"""
+        ui_logger.debug(f"切片任务开始: {data}")
+        self.slice_started.emit()
+        
+    def _on_slice_task_completed(self, data: Dict[str, Any]) -> None:
+        """处理切片任务完成事件"""
+        ui_logger.debug(f"切片任务完成: {data}")
+        
+    def _on_slice_task_failed(self, data: Dict[str, Any]) -> None:
+        """处理切片任务失败事件"""
+        error_msg = data.get("error", "未知错误")
+        ui_logger.error(f"切片任务失败: {error_msg}")
+        self.slice_error.emit(error_msg)
+        
+    def _on_slice_processing_started(self, data: Dict[str, Any]) -> None:
+        """处理切片处理开始事件"""
+        ui_logger.debug(f"切片处理开始: {data}")
+        
+    def _on_slice_processing_completed(self, data: Dict[str, Any]) -> None:
+        """处理切片处理完成事件"""
+        ui_logger.debug(f"切片处理完成: {data}")
+        
+    def _on_slice_processing_failed(self, data: Dict[str, Any]) -> None:
+        """处理切片处理失败事件"""
+        error_msg = data.get("error", "未知错误")
+        ui_logger.error(f"切片处理失败: {error_msg}")
+        
     def start_slice(self, window) -> None:
         """处理开始切片事件
         
@@ -230,7 +307,6 @@ class SignalSliceHandler(QObject):
             ui_logger.error(error_msg)
             QMessageBox.critical(window, "错误", error_msg)
             self.slice_error.emit(error_msg)
-            self.slice_finished.emit(False)
             
     def _handle_slice_result(self, future, window) -> None:
         """处理切片任务的执行结果

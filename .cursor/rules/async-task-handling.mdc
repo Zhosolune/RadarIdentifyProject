@@ -1,0 +1,153 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 异步任务处理规则
+
+## 异步任务设计原则
+
+1. **任务封装原则**：
+   - 每个异步任务应封装为独立的类或函数
+   - 任务应有明确的输入参数和返回值
+   - 示例：[signal_tasks.py](mdc:RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py)中的`SignalImportTask`
+
+2. **结果处理原则**：
+   - 任务结果应包含成功标志、消息和数据
+   - 返回格式统一为`Tuple[bool, str, Optional[Data]]`
+   - 第一个参数表示成功/失败
+   - 第二个参数为消息文本
+   - 第三个参数为可选的返回数据
+
+3. **事件发布原则**：
+   - 任务开始时发布`xxx_started`事件
+   - 任务成功完成时发布`xxx_completed`事件
+   - 任务失败时发布`xxx_failed`事件
+   - 事件数据应包含任务相关的所有必要信息
+
+## 线程安全规则
+
+1. **UI更新规则**：
+   - 所有UI更新必须在主线程中进行
+   - 使用`QMetaObject.invokeMethod`或信号槽机制在线程间通信
+   - 示例：[ui_handlers.py](mdc:RadarIdentifySystem/radar_system/interface/handlers/ui_handlers.py)中的`_handle_import_result`方法
+
+2. **线程检查**：
+   - 在处理异步任务结果前，先检查当前线程
+   - 使用`QThread.currentThread() is QApplication.instance().thread()`判断是否在主线程
+   - 根据线程状态选择合适的UI更新方式
+
+3. **资源共享规则**：
+   - 多线程访问共享资源时使用锁保护
+   - 避免长时间持有锁，减少线程阻塞
+   - 使用线程安全的数据结构
+
+## 错误处理规则
+
+1. **异常捕获原则**：
+   - 异步任务必须捕获并处理所有可能的异常
+   - 不允许异常向上传播到线程池
+   - 将异常转换为任务失败结果返回
+
+2. **错误报告原则**：
+   - 任务失败时，必须提供详细的错误信息
+   - 记录错误日志，包含异常类型和堆栈信息
+   - 通过事件总线发布错误事件
+
+## 任务取消和超时
+
+1. **任务取消机制**：
+   - 提供取消正在执行的任务的机制
+   - 任务应定期检查取消标志
+   - 取消时应释放所有资源并发布取消事件
+
+2. **超时处理**：
+   - 为长时间运行的任务设置超时机制
+   - 超时后应自动取消任务并通知用户
+   - 避免任务无限期阻塞
+
+## 参考实现
+
+### 正确的异步任务实现
+
+```python
+@dataclass
+class SignalImportTask:
+    file_path: str
+    service: SignalService
+    event_bus: EventBus
+    
+    def execute(self) -> Tuple[bool, str, Optional[SignalData]]:
+        try:
+            # 发布任务开始事件
+            self.event_bus.publish("import_task_started", {"file_path": self.file_path})
+            
+            # 执行任务逻辑
+            success, message, signal = self.service.load_signal_file(self.file_path)
+            if not success:
+                return False, message, None
+                
+            # 发布任务完成事件
+            self.event_bus.publish("import_task_completed", {
+                "signal_id": signal.id,
+                "data_count": signal.data_count
+            })
+            
+            return True, "导入完成", signal
+            
+        except Exception as e:
+            error_msg = f"导入任务执行出错: {str(e)}"
+            self.event_bus.publish("import_task_failed", {
+                "file_path": self.file_path,
+                "error": error_msg
+            })
+            return False, error_msg, None
+```
+
+### 正确的任务结果处理
+
+```python
+def _handle_import_result(self, future, window) -> None:
+    # 检查当前线程
+    is_main_thread = QThread.currentThread() is QApplication.instance().thread()
+    
+    try:
+        success, message, signal = future.result()
+        
+        # 根据线程状态选择处理方式
+        if not is_main_thread:
+            # 在非主线程中，通过信号机制更新UI
+            self.import_finished.emit(success)
+            if not success:
+                self.import_error.emit(message)
+            return
+            
+        # 在主线程中，直接更新UI
+        if not success:
+            QMessageBox.warning(window, "错误", message)
+            self.import_error.emit(message)
+        
+        # 发送完成信号
+        self.import_finished.emit(success)
+        
+    except Exception as e:
+        # 处理异常
+        error_msg = f"处理导入结果时出错: {str(e)}"
+        ui_logger.error(error_msg)
+        
+        if not is_main_thread:
+            self.import_error.emit(error_msg)
+            self.import_finished.emit(False)
+            return
+            
+        QMessageBox.critical(window, "错误", error_msg)
+        self.import_error.emit(error_msg)
+        self.import_finished.emit(False)
+```
+
+## 相关文件
+
+- [thread_pool.py](mdc:RadarIdentifySystem/radar_system/infrastructure/async_core/thread_pool/pool.py) - 线程池实现
+- [signal_tasks.py](mdc:RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py) - 信号处理任务
+- [ui_handlers.py](mdc:RadarIdentifySystem/radar_system/interface/handlers/ui_handlers.py) - UI事件处理器
+
