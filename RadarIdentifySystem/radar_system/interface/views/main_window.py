@@ -27,7 +27,7 @@ from radar_system.domain.signal.entities.signal import SignalSlice
 from radar_system.domain.signal.services.processor import SignalProcessor
 from radar_system.domain.signal.services.plotter import SignalPlotter
 from radar_system.domain.signal.repositories.signal_repository import SignalRepository
-from radar_system.infrastructure.persistence.file_storage import FileStorage
+from radar_system.infrastructure.persistence.file.file_storage import FileStorage
 
 class MainWindow(QMainWindow):
     """主窗口类
