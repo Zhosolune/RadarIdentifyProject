@@ -15,6 +15,7 @@ from radar_system.domain.signal.repositories.signal_repository import SignalRepo
 from radar_system.infrastructure.persistence.excel.reader import ExcelReader
 from radar_system.infrastructure.common.logging import system_logger
 from radar_system.infrastructure.async_core.event_bus.event_bus import EventBus
+from radar_system.infrastructure.async_core.event_bus.event_constants import SignalEvents
 from radar_system.infrastructure.common.config import ConfigManager
 from radar_system.infrastructure.async_core.thread_pool.pool import ThreadPool
 
@@ -96,7 +97,7 @@ class SignalService:
         try:
             # 发布开始加载事件
             self.event_bus.publish(
-                "signal_loading_started",
+                SignalEvents.DATA_LOADING_STARTED,
                 {"file_path": file_path}
             )
             
@@ -120,7 +121,7 @@ class SignalService:
             valid, message = self.validator.validate_signal(signal)
             if not valid:
                 self.event_bus.publish(
-                    "signal_validation_failed",
+                    SignalEvents.DATA_VALIDATION_FAILED,
                     {
                         "file_path": file_path,
                         "error": message
@@ -134,7 +135,7 @@ class SignalService:
             
             # 发布加载完成事件
             self.event_bus.publish(
-                "signal_loading_completed",
+                SignalEvents.DATA_LOADING_COMPLETED,
                 {
                     "signal_id": signal.id,
                     "data_count": signal.data_count,
@@ -149,7 +150,7 @@ class SignalService:
             error_msg = f"加载信号数据出错: {str(e)}"
             system_logger.error(error_msg)
             self.event_bus.publish(
-                "signal_loading_failed",
+                SignalEvents.DATA_LOADING_FAILED,
                 {
                     "file_path": file_path,
                     "error": error_msg
@@ -171,7 +172,7 @@ class SignalService:
         try:
             # 发布开始切片事件
             self.event_bus.publish(
-                "slice_processing_started",
+                SignalEvents.SLICE_PROCESSING_STARTED,
                 {"signal_id": signal.id}
             )
             
@@ -185,7 +186,7 @@ class SignalService:
             
             # 发布切片完成事件
             self.event_bus.publish(
-                "slice_processing_completed",
+                SignalEvents.SLICE_PROCESSING_COMPLETED,
                 {
                     "signal_id": signal.id,
                     "slice_count": len(slices)
@@ -198,7 +199,7 @@ class SignalService:
             error_msg = f"切片处理出错: {str(e)}"
             system_logger.error(error_msg)
             self.event_bus.publish(
-                "slice_processing_failed",
+                SignalEvents.SLICE_PROCESSING_FAILED,
                 {
                     "signal_id": signal.id,
                     "error": error_msg

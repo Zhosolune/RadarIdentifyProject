@@ -32,39 +32,16 @@ class SignalImportTask:
             tuple: (是否成功, 消息, 信号数据)
         """
         try:
-            # 发布任务开始事件
-            self.event_bus.publish(
-                "import_task_started",
-                {"file_path": self.file_path}
-            )
-            
-            # 加载文件
+            # 直接调用服务，由服务层发布事件
             success, message, signal = self.service.load_signal_file(self.file_path)
             if not success:
                 return False, message, None
-                
-            # 发布任务完成事件
-            self.event_bus.publish(
-                "import_task_completed",
-                {
-                    "signal_id": signal.id,
-                    "data_count": signal.data_count,
-                    "band_type": signal.band_type
-                }
-            )
-            
+
             return True, "导入完成", signal
-            
+
         except Exception as e:
             error_msg = f"导入任务执行出错: {str(e)}"
             system_logger.error(error_msg)
-            self.event_bus.publish(
-                "import_task_failed",
-                {
-                    "file_path": self.file_path,
-                    "error": error_msg
-                }
-            )
             return False, error_msg, None
 
 @dataclass
@@ -89,38 +66,16 @@ class SignalSliceTask:
             tuple: (是否成功, 消息, 切片列表)
         """
         try:
-            # 发布任务开始事件
-            self.event_bus.publish(
-                "slice_task_started",
-                {"signal_id": self.signal.id}
-            )
-            
-            # 执行切片
+            # 直接调用服务，由服务层发布事件
             success, message, slices = self.service.start_slice_processing(self.signal)
             if not success:
                 return False, message, None
-                
-            # 发布任务完成事件
-            self.event_bus.publish(
-                "slice_task_completed",
-                {
-                    "signal_id": self.signal.id,
-                    "slice_count": len(slices)
-                }
-            )
-            
+
             return True, "切片完成", slices
-            
+
         except Exception as e:
             error_msg = f"切片任务执行出错: {str(e)}"
             system_logger.error(error_msg)
-            self.event_bus.publish(
-                "slice_task_failed",
-                {
-                    "signal_id": self.signal.id,
-                    "error": error_msg
-                }
-            )
             return False, error_msg, None
 
 
