@@ -14,7 +14,8 @@ from pathlib import Path
 from radar_system.interface.styles.style_sheets import StyleSheets
 from radar_system.interface.layouts.main_layout import setup_main_layout
 from radar_system.interface.views.components.loading_spinner import LoadingSpinner
-from radar_system.interface.handlers.ui_handlers import SignalImportHandler, SignalSliceHandler
+from radar_system.interface.handlers.signal_import_handler import SignalImportHandler
+from radar_system.interface.handlers.signal_slice_handler import SignalSliceHandler
 from radar_system.infrastructure.common.logging import ui_logger
 from radar_system.infrastructure.common.exceptions import UIError
 from radar_system.infrastructure.async_core.event_bus.event_bus import EventBus
@@ -340,14 +341,14 @@ class MainWindow(QMainWindow):
             self.signal_import_handler.import_error.connect(self._on_import_error)
             self.signal_import_handler.file_selected.connect(self._on_file_selected)
             
-            # 切片相关信号
-            self.slice_handler.slice_started.connect(self._on_slice_started)
-            self.slice_handler.slice_finished.connect(self._on_slice_completed)
-            self.slice_handler.slice_error.connect(self._on_slice_error)
-            
             # 切片按钮信号
             self.start_slice_btn.clicked.connect(self._on_start_slice)
             self.next_slice_btn.clicked.connect(self._on_next_slice)
+
+            # 切片相关信号
+            self.slice_handler.slice_started.connect(self._on_slice_started)
+            self.slice_handler.slice_completed.connect(self._on_slice_completed)
+            self.slice_handler.slice_failed.connect(self._on_slice_error)
             
             ui_logger.debug("信号连接设置完成")
             
@@ -566,11 +567,12 @@ class MainWindow(QMainWindow):
         except Exception as e:
             ui_logger.error(f"处理切片开始事件时出错: {str(e)}")
 
-    def _on_slice_completed(self, success: bool) -> None:
+    def _on_slice_completed(self, success: bool, slice_count: int) -> None:
         """切片完成的槽函数
-        
+
         Args:
             success: 是否成功
+            slice_count: 切片数量
         """
         try:
             self._stop_loading_animation()
@@ -581,20 +583,19 @@ class MainWindow(QMainWindow):
                 
                 # 获取切片信息
                 signal = self.signal_service.get_current_signal()
-                slices = self.signal_service.get_current_slices()
-                if signal and slices:
+                if signal:
                     # 计算空切片数量
-                    empty_slice_count = signal.expected_slices - len(slices)
-                    
+                    empty_slice_count = signal.expected_slices - slice_count
+
                     # 更新切片信息显示
                     if empty_slice_count > 0:
                         self.slice_info_label2.setText(
-                            f"共获得{len(slices)}个250ms切片，以及"
+                            f"共获得{slice_count}个250ms切片，以及"
                             f"<span style='color: red;'>{empty_slice_count}</span>个空切片"
                         )
                     else:
                         self.slice_info_label2.setText(
-                            f"共获得{len(slices)}个250ms切片"
+                            f"共获得{slice_count}个250ms切片"
                         )
                     
                     # 显示第一个切片
@@ -662,7 +663,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'left_plots'):
                 # 获取当前切片序号
                 current_index = self.slice_handler.current_slice_index
-                total_count = len(self.slice_handler.slices or [])
+                total_count = len(self.slice_handler.current_slices or [])
                 
                 # 更新左侧标题
                 self.left_title.setText(f"第{current_index + 1}个切片数据 原始图像")

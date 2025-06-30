@@ -1,17 +1,16 @@
 """信号切片处理器
 
-基于实际需求的简化实现，避免过度设计。
+统一的信号切片事件处理器，基于简化的事件系统实现。
 """
 
-import uuid
 from typing import Dict, Any, Optional
-from PyQt5.QtCore import QObject, pyqtSignal, QThread, QApplication
+from PyQt5.QtCore import QObject, pyqtSignal, QThread
+from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QMessageBox
 
 from radar_system.infrastructure.common.logging import ui_logger
 from radar_system.infrastructure.async_core.event_bus.event_bus import EventBus
 from radar_system.infrastructure.async_core.event_bus.event_constants import SignalEvents
-from radar_system.application.services.signal_service import SignalService
 from radar_system.application.tasks.signal_tasks import SignalSliceTask
 from radar_system.domain.signal.entities.signal import SignalData, SignalSlice
 
@@ -28,10 +27,10 @@ class SignalSliceHandler(QObject):
     4. 线程安全的UI更新
     """
     
-    # 只定义实际需要的Qt信号
-    slice_started = pyqtSignal()
-    slice_completed = pyqtSignal(bool, int)  # 成功标志, 切片数量
-    slice_failed = pyqtSignal(str)  # 错误信息
+    # 定义Qt信号（统一版本，每个功能只有一个信号）
+    slice_started = pyqtSignal()                    # 切片开始
+    slice_completed = pyqtSignal(bool, int)         # 切片完成(成功标志, 切片数量)
+    slice_failed = pyqtSignal(str)                  # 切片失败(错误信息)
     
     def __init__(self, event_bus: EventBus):
         super().__init__()
@@ -64,9 +63,9 @@ class SignalSliceHandler(QObject):
         """处理切片完成事件"""
         signal_id = data.get('signal_id', 'unknown')
         slice_count = data.get('slice_count', 0)
-        
+
         ui_logger.info(f"信号切片完成: {signal_id}, 切片数量: {slice_count}")
-        
+
         # 线程安全的UI更新
         self._safe_emit_signal(self.slice_completed, True, slice_count)
     
@@ -74,9 +73,9 @@ class SignalSliceHandler(QObject):
         """处理切片失败事件"""
         signal_id = data.get('signal_id', 'unknown')
         error = data.get('error', '未知错误')
-        
+
         ui_logger.error(f"信号切片失败: {signal_id}, 错误: {error}")
-        
+
         # 线程安全的UI更新
         self._safe_emit_signal(self.slice_failed, error)
     
@@ -132,21 +131,34 @@ class SignalSliceHandler(QObject):
     
     def _handle_slice_result(self, future, window) -> None:
         """处理切片任务结果"""
+        # 检查当前线程
+        is_main_thread = QThread.currentThread() is QApplication.instance().thread()
+
         try:
             success, message, slices = future.result()
-            
+
+            # 无论在哪个线程，都保存切片结果
             if success and slices:
-                # 保存切片结果
                 self.current_slices = slices
                 self.current_slice_index = -1
                 ui_logger.info(f"切片任务完成，生成{len(slices)}个切片")
+
+                # 如果在主线程且有切片，显示第一个切片
+                if is_main_thread and len(slices) > 0:
+                    self.show_next_slice(window)
             else:
                 ui_logger.error(f"切片任务失败: {message}")
-                
+
+            # 发送切片完成信号
+            if success:
+                self._safe_emit_signal(self.slice_completed, True, len(slices) if slices else 0)
+            else:
+                self._safe_emit_signal(self.slice_failed, message)
+
         except Exception as e:
             error_msg = f"处理切片结果时出错: {str(e)}"
             ui_logger.error(error_msg)
-            self._show_message_box(window, "错误", error_msg, QMessageBox.Critical)
+            self._safe_emit_signal(self.slice_failed, error_msg)
     
     def _show_message_box(self, parent, title: str, message: str, icon) -> None:
         """线程安全的消息框显示"""
@@ -180,12 +192,18 @@ class SignalSliceHandler(QObject):
         
         self.current_slice_index += 1
         current_slice = self.current_slices[self.current_slice_index]
-        
+
         ui_logger.info(f"显示切片 {self.current_slice_index + 1}/{len(self.current_slices)}")
-        
-        # 这里应该调用窗口的切片显示更新方法
-        # 具体实现取决于窗口的接口设计
-        
+
+        # 调用窗口的切片显示更新方法（兼容旧版本接口）
+        try:
+            if hasattr(window, '_update_slice_display'):
+                window._update_slice_display(current_slice)
+            elif hasattr(window, 'update_slice_display'):
+                window.update_slice_display(current_slice)
+        except Exception as e:
+            ui_logger.warning(f"更新切片显示失败: {str(e)}")
+
         return True
     
     def get_current_slice(self) -> Optional[SignalSlice]:
@@ -201,18 +219,20 @@ class SignalSliceHandler(QObject):
     def get_slice_count(self) -> int:
         """获取切片总数"""
         return len(self.current_slices) if self.current_slices else 0
-    
+
     def reset_slices(self) -> None:
         """重置切片状态"""
         self.current_slices = None
         self.current_slice_index = -1
         ui_logger.debug("切片状态已重置")
-    
+
+
+
     def cleanup(self) -> None:
         """清理资源"""
         # 取消事件订阅
         self.event_bus.unsubscribe(SignalEvents.SLICE_PROCESSING_STARTED, self._on_slice_started)
         self.event_bus.unsubscribe(SignalEvents.SLICE_PROCESSING_COMPLETED, self._on_slice_completed)
         self.event_bus.unsubscribe(SignalEvents.SLICE_PROCESSING_FAILED, self._on_slice_failed)
-        
+
         ui_logger.info("SignalSliceHandler 资源已清理")
