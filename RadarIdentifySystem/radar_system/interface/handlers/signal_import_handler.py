@@ -52,31 +52,11 @@ class SignalImportHandler(QObject):
     
     def _subscribe_events(self) -> None:
         """订阅事件"""
-        self.event_bus.subscribe(SignalEvents.DATA_IMPORT_STARTED, self._on_import_started)
-        self.event_bus.subscribe(SignalEvents.DATA_IMPORT_COMPLETED, self._on_import_completed)
-        self.event_bus.subscribe(SignalEvents.DATA_IMPORT_FAILED, self._on_import_failed)
         self.event_bus.subscribe(SignalEvents.DATA_LOADING_STARTED, self._on_loading_started)
         self.event_bus.subscribe(SignalEvents.DATA_LOADING_COMPLETED, self._on_loading_completed)
         self.event_bus.subscribe(SignalEvents.DATA_LOADING_FAILED, self._on_loading_failed)
     
-    def _on_import_started(self, data: Dict[str, Any]) -> None:
-        """处理导入开始事件"""
-        file_path = data.get("file_path", "unknown")
-        ui_logger.info(f"信号导入开始: {file_path}")
-        self._safe_emit_signal(self.import_started)
-    
-    def _on_import_completed(self, data: Dict[str, Any]) -> None:
-        """处理导入完成事件"""
-        signal_id = data.get("signal_id", "unknown")
-        ui_logger.info(f"信号导入完成: {signal_id}")
-        self._safe_emit_signal(self.import_finished, True)
-    
-    def _on_import_failed(self, data: Dict[str, Any]) -> None:
-        """处理导入失败事件"""
-        error = data.get("error", "未知错误")
-        ui_logger.error(f"信号导入失败: {error}")
-        self._safe_emit_signal(self.import_error, error)
-        self._safe_emit_signal(self.import_finished, False)
+
     
     def _on_loading_started(self, data: Dict[str, Any]) -> None:
         """处理加载开始事件"""
@@ -87,13 +67,14 @@ class SignalImportHandler(QObject):
         """处理加载完成事件"""
         signal_id = data.get("signal_id", "unknown")
         ui_logger.debug(f"信号加载完成: {signal_id}")
+        # 注意：不在这里发射import_finished信号，避免与_handle_import_result重复
     
     def _on_loading_failed(self, data: Dict[str, Any]) -> None:
         """处理加载失败事件"""
         error = data.get("error", "未知错误")
         ui_logger.error(f"信号加载失败: {error}")
+        # 发射错误信号，但不发射import_finished信号（避免与_handle_import_result重复）
         self._safe_emit_signal(self.import_error, error)
-        self._safe_emit_signal(self.import_finished, False)
     
     def _safe_emit_signal(self, signal, *args) -> None:
         """线程安全的信号发射"""
@@ -196,19 +177,24 @@ class SignalImportHandler(QObject):
     
     def _handle_import_result(self, future, window) -> None:
         """处理导入任务的执行结果
-        
+
         Args:
             future: Future对象，包含任务执行结果
             window: 主窗口实例
         """
         try:
             success, message, signal = future.result()
-            
+
             if success and signal:
                 ui_logger.info(f"导入任务完成: {signal.id}")
+                # 发射导入成功信号
+                self._safe_emit_signal(self.import_finished, True)
             else:
                 ui_logger.error(f"导入任务失败: {message}")
-                
+                # 发射导入失败信号
+                self._safe_emit_signal(self.import_error, message)
+                self._safe_emit_signal(self.import_finished, False)
+
         except Exception as e:
             error_msg = f"处理导入结果时出错: {str(e)}"
             ui_logger.error(error_msg)
@@ -217,10 +203,7 @@ class SignalImportHandler(QObject):
 
     def cleanup(self) -> None:
         """清理资源"""
-        # 取消事件订阅
-        self.event_bus.unsubscribe(SignalEvents.DATA_IMPORT_STARTED, self._on_import_started)
-        self.event_bus.unsubscribe(SignalEvents.DATA_IMPORT_COMPLETED, self._on_import_completed)
-        self.event_bus.unsubscribe(SignalEvents.DATA_IMPORT_FAILED, self._on_import_failed)
+        # 取消事件订阅（只取消实际订阅的事件）
         self.event_bus.unsubscribe(SignalEvents.DATA_LOADING_STARTED, self._on_loading_started)
         self.event_bus.unsubscribe(SignalEvents.DATA_LOADING_COMPLETED, self._on_loading_completed)
         self.event_bus.unsubscribe(SignalEvents.DATA_LOADING_FAILED, self._on_loading_failed)

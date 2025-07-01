@@ -370,7 +370,15 @@ class MainWindow(QMainWindow):
         
     def _on_import_data(self) -> None:
         """导入数据按钮点击事件处理"""
-        self.signal_import_handler.import_data(self)
+        # 从import_path控件获取文件路径
+        file_path = self.import_path.text().strip()
+
+        if not file_path:
+            QMessageBox.warning(self, "警告", "请先选择要导入的文件")
+            return
+
+        # 调用导入处理器
+        self.signal_import_handler.import_data(self, file_path)
         
     def _on_file_selected(self, file_path: str) -> None:
         """文件选择完成的槽函数
