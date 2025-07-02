@@ -5,15 +5,16 @@
 
 from typing import Optional
 from pathlib import Path
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QApplication
+from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 from radar_system.application.tasks.signal_tasks import SignalImportTask
 from radar_system.infrastructure.common.logging import ui_logger
+from radar_system.infrastructure.common.thread_safe_signal_emitter import ThreadSafeSignalEmitter
 
 
 
-class SignalImportHandler(QObject):
+class SignalImportHandler(ThreadSafeSignalEmitter):
     """信号导入事件处理器
     
     处理与信号数据导入相关的所有UI事件。
@@ -43,23 +44,7 @@ class SignalImportHandler(QObject):
     
 
     
-    def _safe_emit_signal(self, signal, *args) -> None:
-        """线程安全的信号发射"""
-        if QThread.currentThread() is QApplication.instance().thread():
-            # 在主线程中直接发射
-            signal.emit(*args)
-        else:
-            # 在非主线程中，使用QMetaObject.invokeMethod
-            from PyQt5.QtCore import QMetaObject, Qt
-            QMetaObject.invokeMethod(
-                self, "_emit_signal_in_main_thread",
-                Qt.QueuedConnection,
-                signal, *args
-            )
-    
-    def _emit_signal_in_main_thread(self, signal, *args) -> None:
-        """在主线程中发射信号"""
-        signal.emit(*args)
+
     
     def browse_file(self, window) -> Optional[str]:
         """浏览文件方法
@@ -154,18 +139,18 @@ class SignalImportHandler(QObject):
             if success and signal:
                 ui_logger.info(f"导入任务完成: {signal.id}")
                 # 发射导入成功信号
-                self._safe_emit_signal(self.import_finished, True)
+                self.safe_emit_signal(self.import_finished, True)
             else:
                 ui_logger.error(f"导入任务失败: {message}")
                 # 发射导入失败信号
-                self._safe_emit_signal(self.import_error, message)
-                self._safe_emit_signal(self.import_finished, False)
+                self.safe_emit_signal(self.import_error, message)
+                self.safe_emit_signal(self.import_finished, False)
 
         except Exception as e:
             error_msg = f"处理导入结果时出错: {str(e)}"
             ui_logger.error(error_msg)
-            self._safe_emit_signal(self.import_error, error_msg)
-            self._safe_emit_signal(self.import_finished, False)
+            self.safe_emit_signal(self.import_error, error_msg)
+            self.safe_emit_signal(self.import_finished, False)
 
     def cleanup(self) -> None:
         """清理资源"""

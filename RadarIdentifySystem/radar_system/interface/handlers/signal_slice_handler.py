@@ -4,17 +4,17 @@
 """
 
 from typing import Optional
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtCore import pyqtSignal, QThread
+from PyQt5.QtWidgets import QApplication, QMessageBox
 
 from radar_system.infrastructure.common.logging import ui_logger
+from radar_system.infrastructure.common.thread_safe_signal_emitter import ThreadSafeSignalEmitter
 
 from radar_system.application.tasks.signal_tasks import SignalSliceTask
 from radar_system.domain.signal.entities.signal import SignalData, SignalSlice
 
 
-class SignalSliceHandler(QObject):
+class SignalSliceHandler(ThreadSafeSignalEmitter):
     """信号切片事件处理器
     
     只实现当前实际需要的功能，避免过度设计。
@@ -42,23 +42,7 @@ class SignalSliceHandler(QObject):
     
 
     
-    def _safe_emit_signal(self, signal, *args) -> None:
-        """线程安全的信号发射"""
-        if QThread.currentThread() is QApplication.instance().thread():
-            # 在主线程中直接发射
-            signal.emit(*args)
-        else:
-            # 在非主线程中，使用QMetaObject.invokeMethod
-            from PyQt5.QtCore import QMetaObject, Qt
-            QMetaObject.invokeMethod(
-                self, "_emit_signal_in_main_thread",
-                Qt.QueuedConnection,
-                signal, *args
-            )
-    
-    def _emit_signal_in_main_thread(self, signal, *args) -> None:
-        """在主线程中发射信号"""
-        signal.emit(*args)
+
     
     def start_slice(self, window, signal: SignalData) -> None:
         """启动信号切片处理
@@ -73,7 +57,7 @@ class SignalSliceHandler(QObject):
         
         try:
             # 发射切片开始信号
-            self._safe_emit_signal(self.slice_started)
+            self.safe_emit_signal(self.slice_started)
 
             # 创建切片任务（移除event_bus参数）
             slice_task = SignalSliceTask(
@@ -116,14 +100,14 @@ class SignalSliceHandler(QObject):
 
             # 发送切片完成信号
             if success:
-                self._safe_emit_signal(self.slice_completed, True, len(slices) if slices else 0)
+                self.safe_emit_signal(self.slice_completed, True, len(slices) if slices else 0)
             else:
-                self._safe_emit_signal(self.slice_failed, message)
+                self.safe_emit_signal(self.slice_failed, message)
 
         except Exception as e:
             error_msg = f"处理切片结果时出错: {str(e)}"
             ui_logger.error(error_msg)
-            self._safe_emit_signal(self.slice_failed, error_msg)
+            self.safe_emit_signal(self.slice_failed, error_msg)
     
     def _show_message_box(self, parent, title: str, message: str, icon) -> None:
         """线程安全的消息框显示"""
@@ -132,14 +116,10 @@ class SignalSliceHandler(QObject):
             msg_box = QMessageBox(icon, title, message, QMessageBox.Ok, parent)
             msg_box.exec_()
         else:
-            # 在非主线程中，使用QMetaObject.invokeMethod
-            from PyQt5.QtCore import QMetaObject, Qt
-            QMetaObject.invokeMethod(
-                self, "_show_message_box_in_main_thread",
-                Qt.QueuedConnection,
-                parent, title, message, icon
-            )
-    
+            # 在非主线程中，使用QTimer.singleShot来确保在主线程中执行
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(0, lambda: self._show_message_box_in_main_thread(parent, title, message, icon))
+
     def _show_message_box_in_main_thread(self, parent, title: str, message: str, icon) -> None:
         """在主线程中显示消息框"""
         msg_box = QMessageBox(icon, title, message, QMessageBox.Ok, parent)

@@ -627,7 +627,15 @@ class MainWindow(QMainWindow):
     def _on_start_slice(self) -> None:
         """开始切片按钮点击事件处理"""
         try:
-            self.slice_handler.start_slice(self)
+            # 获取当前信号数据
+            signal = self.signal_service.get_current_signal()
+            if not signal:
+                QMessageBox.warning(self, "警告", "请先导入信号数据")
+                return
+
+            # 调用切片处理器，传递必需的 signal 参数
+            self.slice_handler.start_slice(self, signal)
+            
         except Exception as e:
             ui_logger.error(f"处理开始切片事件时出错: {str(e)}")
 
