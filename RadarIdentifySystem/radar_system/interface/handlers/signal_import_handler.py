@@ -3,15 +3,14 @@
 处理与信号数据导入相关的所有UI事件。
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional
 from pathlib import Path
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QApplication
 
 from radar_system.application.tasks.signal_tasks import SignalImportTask
 from radar_system.infrastructure.common.logging import ui_logger
-from radar_system.infrastructure.async_core.event_bus.event_bus import EventBus
-from radar_system.infrastructure.async_core.event_bus.event_constants import SignalEvents
+
 
 
 class SignalImportHandler(QObject):
@@ -35,46 +34,14 @@ class SignalImportHandler(QObject):
     import_error = pyqtSignal(str)  # 参数为错误信息
     file_selected = pyqtSignal(str)  # 参数为文件路径
     
-    def __init__(self, event_bus: EventBus):
-        """初始化处理器
-        
-        Args:
-            event_bus: 事件总线实例
-        """
+    def __init__(self):
+        """初始化处理器"""
         super().__init__()
-        self.event_bus = event_bus
         self._last_directory = None  # 会话级路径记忆
-        
-        # 订阅事件总线事件（使用新的事件常量）
-        self._subscribe_events()
-        
+
         ui_logger.info("SignalImportHandler 初始化完成")
     
-    def _subscribe_events(self) -> None:
-        """订阅事件"""
-        self.event_bus.subscribe(SignalEvents.DATA_LOADING_STARTED, self._on_loading_started)
-        self.event_bus.subscribe(SignalEvents.DATA_LOADING_COMPLETED, self._on_loading_completed)
-        self.event_bus.subscribe(SignalEvents.DATA_LOADING_FAILED, self._on_loading_failed)
-    
 
-    
-    def _on_loading_started(self, data: Dict[str, Any]) -> None:
-        """处理加载开始事件"""
-        file_path = data.get("file_path", "unknown")
-        ui_logger.debug(f"信号加载开始: {file_path}")
-    
-    def _on_loading_completed(self, data: Dict[str, Any]) -> None:
-        """处理加载完成事件"""
-        signal_id = data.get("signal_id", "unknown")
-        ui_logger.debug(f"信号加载完成: {signal_id}")
-        # 注意：不在这里发射import_finished信号，避免与_handle_import_result重复
-    
-    def _on_loading_failed(self, data: Dict[str, Any]) -> None:
-        """处理加载失败事件"""
-        error = data.get("error", "未知错误")
-        ui_logger.error(f"信号加载失败: {error}")
-        # 发射错误信号，但不发射import_finished信号（避免与_handle_import_result重复）
-        self._safe_emit_signal(self.import_error, error)
     
     def _safe_emit_signal(self, signal, *args) -> None:
         """线程安全的信号发射"""
@@ -154,11 +121,10 @@ class SignalImportHandler(QObject):
             # 发送导入开始信号
             self.import_started.emit()
             
-            # 创建导入任务
+            # 创建导入任务（移除event_bus参数）
             import_task = SignalImportTask(
                 file_path=file_path,
-                service=window.signal_service,
-                event_bus=self.event_bus
+                service=window.signal_service
             )
             
             # 提交任务到线程池
@@ -203,9 +169,4 @@ class SignalImportHandler(QObject):
 
     def cleanup(self) -> None:
         """清理资源"""
-        # 取消事件订阅（只取消实际订阅的事件）
-        self.event_bus.unsubscribe(SignalEvents.DATA_LOADING_STARTED, self._on_loading_started)
-        self.event_bus.unsubscribe(SignalEvents.DATA_LOADING_COMPLETED, self._on_loading_completed)
-        self.event_bus.unsubscribe(SignalEvents.DATA_LOADING_FAILED, self._on_loading_failed)
-
         ui_logger.info("SignalImportHandler 资源已清理")

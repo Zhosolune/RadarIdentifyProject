@@ -3,14 +3,13 @@
 统一的信号切片事件处理器，基于简化的事件系统实现。
 """
 
-from typing import Dict, Any, Optional
+from typing import Optional
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QMessageBox
 
 from radar_system.infrastructure.common.logging import ui_logger
-from radar_system.infrastructure.async_core.event_bus.event_bus import EventBus
-from radar_system.infrastructure.async_core.event_bus.event_constants import SignalEvents
+
 from radar_system.application.tasks.signal_tasks import SignalSliceTask
 from radar_system.domain.signal.entities.signal import SignalData, SignalSlice
 
@@ -32,52 +31,16 @@ class SignalSliceHandler(QObject):
     slice_completed = pyqtSignal(bool, int)         # 切片完成(成功标志, 切片数量)
     slice_failed = pyqtSignal(str)                  # 切片失败(错误信息)
     
-    def __init__(self, event_bus: EventBus):
+    def __init__(self):
         super().__init__()
-        self.event_bus = event_bus
-        
+
         # 切片状态管理
         self.current_slices: Optional[list] = None
         self.current_slice_index: int = -1
-        
-        # 订阅事件（只订阅实际需要的事件）
-        self._subscribe_events()
-        
+
         ui_logger.info("SignalSliceHandler 初始化完成")
     
-    def _subscribe_events(self) -> None:
-        """订阅事件"""
-        self.event_bus.subscribe(SignalEvents.SLICE_PROCESSING_STARTED, self._on_slice_started)
-        self.event_bus.subscribe(SignalEvents.SLICE_PROCESSING_COMPLETED, self._on_slice_completed)
-        self.event_bus.subscribe(SignalEvents.SLICE_PROCESSING_FAILED, self._on_slice_failed)
-    
-    def _on_slice_started(self, data: Dict[str, Any]) -> None:
-        """处理切片开始事件"""
-        signal_id = data.get('signal_id', 'unknown')
-        ui_logger.info(f"信号切片开始: {signal_id}")
-        
-        # 线程安全的UI更新
-        self._safe_emit_signal(self.slice_started)
-    
-    def _on_slice_completed(self, data: Dict[str, Any]) -> None:
-        """处理切片完成事件"""
-        signal_id = data.get('signal_id', 'unknown')
-        slice_count = data.get('slice_count', 0)
 
-        ui_logger.info(f"信号切片完成: {signal_id}, 切片数量: {slice_count}")
-
-        # 线程安全的UI更新
-        self._safe_emit_signal(self.slice_completed, True, slice_count)
-    
-    def _on_slice_failed(self, data: Dict[str, Any]) -> None:
-        """处理切片失败事件"""
-        signal_id = data.get('signal_id', 'unknown')
-        error = data.get('error', '未知错误')
-
-        ui_logger.error(f"信号切片失败: {signal_id}, 错误: {error}")
-
-        # 线程安全的UI更新
-        self._safe_emit_signal(self.slice_failed, error)
     
     def _safe_emit_signal(self, signal, *args) -> None:
         """线程安全的信号发射"""
@@ -109,11 +72,13 @@ class SignalSliceHandler(QObject):
             return
         
         try:
-            # 创建切片任务（简化版，不发布重复事件）
+            # 发射切片开始信号
+            self._safe_emit_signal(self.slice_started)
+
+            # 创建切片任务（移除event_bus参数）
             slice_task = SignalSliceTask(
                 signal=signal,
-                service=window.signal_service,
-                event_bus=self.event_bus
+                service=window.signal_service
             )
             
             # 提交任务到线程池
@@ -230,9 +195,4 @@ class SignalSliceHandler(QObject):
 
     def cleanup(self) -> None:
         """清理资源"""
-        # 取消事件订阅
-        self.event_bus.unsubscribe(SignalEvents.SLICE_PROCESSING_STARTED, self._on_slice_started)
-        self.event_bus.unsubscribe(SignalEvents.SLICE_PROCESSING_COMPLETED, self._on_slice_completed)
-        self.event_bus.unsubscribe(SignalEvents.SLICE_PROCESSING_FAILED, self._on_slice_failed)
-
         ui_logger.info("SignalSliceHandler 资源已清理")

@@ -2,7 +2,7 @@
 
 ## 概述
 
-本指南基于简化后的事件总线系统，为开发者在RadarIdentifySystem中新增功能提供明确的指导。遵循YAGNI原则，只实现当前需要的功能，避免过度设计。
+本指南为开发者在RadarIdentifySystem中新增功能提供明确的指导。系统已完全移除事件总线，采用简化的架构设计，遵循YAGNI原则，只实现当前需要的功能，避免过度设计。
 
 ## 1. 架构层次流转规范
 
@@ -10,9 +10,9 @@
 
 ```
 ┌─────────────────┐
-│   UI层 (Interface)   │  ← 用户交互、界面显示
+│   UI层 (Interface)   │  ← 用户交互、界面显示、Qt信号槽
 ├─────────────────┤
-│ 应用服务层 (Application) │  ← 业务流程协调、事件发布
+│ 应用服务层 (Application) │  ← 业务流程协调、日志记录
 ├─────────────────┤
 │ 领域服务层 (Domain)     │  ← 纯业务逻辑、算法实现
 ├─────────────────┤
@@ -43,13 +43,13 @@
 - 处理用户交互
 - 显示数据和状态
 - 发布UI状态信号（Qt信号槽）
-- 监听业务事件并更新界面
+- 直接调用应用服务
 
 **不应该做**：
 
 - 包含业务逻辑
-- 直接操作数据
-- 发布业务事件
+- 直接调用领域服务
+- 处理数据持久化
 
 ```python
 # ✅ 正确示例
@@ -71,34 +71,36 @@ class MainWindow(QMainWindow):
 
 **应该做**：
 
-- 协调多个领域服务
-- 发布业务事件
-- 管理事务边界
-- 处理业务流程
+- 协调业务流程
+- 调用领域服务
+- 记录日志信息
+- 处理异常和错误
 
 **不应该做**：
 
-- 包含具体算法实现
-- 直接操作UI
+- 实现具体业务算法
+- 直接操作UI组件
+- 包含领域逻辑
 
 ```python
 # ✅ 正确示例
 class RecognitionService:
     def start_recognition_processing(self, params):
         try:
-            # 发布开始事件
-            self.event_bus.publish(RecognitionEvents.PROCESSING_STARTED, {"params": params})
-            
+            # 记录开始日志
+            system_logger.info(f"开始识别处理: {params}")
+
             # 调用领域服务
             result = self.recognizer.recognize(params)
-            
-            # 发布完成事件
-            self.event_bus.publish(RecognitionEvents.PROCESSING_COMPLETED, {"result": result})
-            
+
+            # 记录完成日志
+            system_logger.info(f"识别处理完成: {result}")
+
             return True, "识别完成", result
         except Exception as e:
-            self.event_bus.publish(RecognitionEvents.PROCESSING_FAILED, {"error": str(e)})
-            return False, str(e), None
+            error_msg = f"识别处理出错: {str(e)}"
+            system_logger.error(error_msg)
+            return False, error_msg, None
 ```
 
 #### 领域服务层 (Domain)
@@ -111,9 +113,9 @@ class RecognitionService:
 
 **不应该做**：
 
-- 发布事件
-- 依赖外部服务
-- 包含UI逻辑
+- 依赖UI框架
+- 记录业务日志
+- 处理持久化细节
 
 ```python
 # ✅ 正确示例

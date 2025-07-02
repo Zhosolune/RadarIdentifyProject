@@ -18,7 +18,7 @@ from radar_system.interface.handlers.signal_import_handler import SignalImportHa
 from radar_system.interface.handlers.signal_slice_handler import SignalSliceHandler
 from radar_system.infrastructure.common.logging import ui_logger
 from radar_system.infrastructure.common.exceptions import UIError
-from radar_system.infrastructure.async_core.event_bus.event_bus import EventBus
+
 from radar_system.domain.signal.services.validator import SignalValidator
 from radar_system.infrastructure.persistence.excel.reader import ExcelReader
 from radar_system.application.services.signal_service import SignalService
@@ -56,9 +56,7 @@ class MainWindow(QMainWindow):
             self.styles = StyleSheets.get_styles()
             self.dimensions = StyleSheets.get_dimensions()
             
-            # 初始化事件总线
-            self.event_bus = EventBus()
-            
+
             # 初始化线程池
             self.thread_pool = ThreadPool(
                 max_workers=4,  # 可以根据需要调整
@@ -78,13 +76,12 @@ class MainWindow(QMainWindow):
                 processor=self.signal_processor,
                 repository=self.signal_repository,
                 excel_reader=self.excel_reader,
-                event_bus=self.event_bus,
                 thread_pool=self.thread_pool
             )
             
-            # 初始化事件处理器
-            self.signal_import_handler = SignalImportHandler(self.event_bus)
-            self.slice_handler = SignalSliceHandler(self.event_bus)
+            # 初始化事件处理器（移除event_bus参数）
+            self.signal_import_handler = SignalImportHandler()
+            self.slice_handler = SignalSliceHandler()
             
             # 设置窗口基本属性
             self._setup_window()

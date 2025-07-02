@@ -14,8 +14,7 @@ from radar_system.domain.signal.services.processor import SignalProcessor
 from radar_system.domain.signal.repositories.signal_repository import SignalRepository
 from radar_system.infrastructure.persistence.excel.reader import ExcelReader
 from radar_system.infrastructure.common.logging import system_logger
-from radar_system.infrastructure.async_core.event_bus.event_bus import EventBus
-from radar_system.infrastructure.async_core.event_bus.event_constants import SignalEvents
+
 from radar_system.infrastructure.common.config import ConfigManager
 from radar_system.infrastructure.async_core.thread_pool.pool import ThreadPool
 
@@ -25,28 +24,25 @@ class SignalService:
     协调信号数据的加载、验证和处理流程。
     """
     
-    def __init__(self, 
+    def __init__(self,
                  validator: SignalValidator,
                  processor: SignalProcessor,
                  repository: SignalRepository,
                  excel_reader: ExcelReader,
-                 event_bus: EventBus,
                  thread_pool: ThreadPool):
         """初始化信号处理服务
-        
+
         Args:
             validator: 信号验证器
             processor: 信号处理器
             repository: 信号数据仓库
             excel_reader: Excel读取器
-            event_bus: 事件总线
             thread_pool: 线程池
         """
         self.validator = validator
         self.processor = processor
         self.repository = repository
         self.excel_reader = excel_reader
-        self.event_bus = event_bus
         self.thread_pool = thread_pool
         self.config_manager = ConfigManager.get_instance()
         self.current_signal = None
@@ -95,20 +91,17 @@ class SignalService:
             tuple: (是否成功, 消息, 信号数据)
         """
         try:
-            # 发布开始加载事件
-            self.event_bus.publish(
-                SignalEvents.DATA_LOADING_STARTED,
-                {"file_path": file_path}
-            )
-            
+            # 记录开始加载日志
+            system_logger.info(f"开始加载信号文件: {file_path}")
+
             # 读取Excel文件
             success, raw_data, message = self.excel_reader.read_radar_data(file_path)
             if not success:
                 return False, message, None
-                
+
             # 处理原始数据
             processed_data, expected_slices = self._process_raw_data(raw_data)
-                
+
             # 创建信号数据实体
             signal = SignalData(
                 id=str(uuid.uuid4()),
@@ -116,46 +109,25 @@ class SignalService:
                 expected_slices=expected_slices,
                 is_valid=False
             )
-            
+
             # 验证数据
             valid, message = self.validator.validate_signal(signal)
             if not valid:
-                self.event_bus.publish(
-                    SignalEvents.DATA_VALIDATION_FAILED,
-                    {
-                        "file_path": file_path,
-                        "error": message
-                    }
-                )
+                system_logger.error(f"信号数据验证失败: {message}")
                 return False, message, None
-            
+
             # 保存当前信号数据
             self.current_signal = signal
             self.repository.save(signal)
-            
-            # 发布加载完成事件
-            self.event_bus.publish(
-                SignalEvents.DATA_LOADING_COMPLETED,
-                {
-                    "signal_id": signal.id,
-                    "data_count": signal.data_count,
-                    "band_type": signal.band_type,
-                    "expected_slices": signal.expected_slices
-                }
-            )
-            
+
+            # 记录加载完成日志
+            system_logger.info(f"信号文件加载完成: {signal.id}, 数据量: {signal.data_count}, 频段: {signal.band_type}")
+
             return True, "数据加载成功", signal
-            
+
         except Exception as e:
             error_msg = f"加载信号数据出错: {str(e)}"
             system_logger.error(error_msg)
-            self.event_bus.publish(
-                SignalEvents.DATA_LOADING_FAILED,
-                {
-                    "file_path": file_path,
-                    "error": error_msg
-                }
-            )
             return False, error_msg, None
             
     def start_slice_processing(self, signal: SignalData) -> Tuple[bool, str, Optional[List[SignalSlice]]]:
@@ -170,41 +142,25 @@ class SignalService:
             tuple: (是否成功, 消息, 切片列表)
         """
         try:
-            # 发布开始切片事件
-            self.event_bus.publish(
-                SignalEvents.SLICE_PROCESSING_STARTED,
-                {"signal_id": signal.id}
-            )
-            
+            # 记录开始切片日志
+            system_logger.info(f"开始信号切片处理: {signal.id}")
+
             # 执行切片
             slices = self.processor.slice_signal(signal)
             if not slices:
                 return False, "切片处理未生成有效数据", None
-                
+
             # 保存切片结果
             self.current_slices = slices
-            
-            # 发布切片完成事件
-            self.event_bus.publish(
-                SignalEvents.SLICE_PROCESSING_COMPLETED,
-                {
-                    "signal_id": signal.id,
-                    "slice_count": len(slices)
-                }
-            )
-            
+
+            # 记录切片完成日志
+            system_logger.info(f"信号切片处理完成: {signal.id}, 切片数量: {len(slices)}")
+
             return True, "切片处理完成", slices
-            
+
         except Exception as e:
             error_msg = f"切片处理出错: {str(e)}"
             system_logger.error(error_msg)
-            self.event_bus.publish(
-                SignalEvents.SLICE_PROCESSING_FAILED,
-                {
-                    "signal_id": signal.id,
-                    "error": error_msg
-                }
-            )
             return False, error_msg, None
             
     def get_current_signal(self) -> Optional[SignalData]:
