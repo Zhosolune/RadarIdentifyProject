@@ -22,7 +22,7 @@ from radar_system.infrastructure.common.exceptions import UIError
 from radar_system.domain.signal.services.validator import SignalValidator
 from radar_system.infrastructure.persistence.excel.reader import ExcelReader
 from radar_system.application.services.signal_service import SignalService
-from radar_system.infrastructure.async_core.thread_pool.pool import ThreadPool
+from radar_system.infrastructure.async_core.pool import ThreadPool
 from radar_system.infrastructure.common.config import ConfigManager
 from radar_system.domain.signal.entities.signal import SignalSlice
 from radar_system.domain.signal.services.processor import SignalProcessor
