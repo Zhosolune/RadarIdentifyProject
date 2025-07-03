@@ -64,24 +64,26 @@ class MainWindow(QMainWindow):
                 idle_timeout=60  # 空闲线程的超时时间（秒）
             )
             
-            # 初始化服务
+            # 初始化Infrastructure层组件
             self.signal_validator = SignalValidator()
             self.excel_reader = ExcelReader()
             self.signal_processor = SignalProcessor()
             self.signal_plotter = SignalPlotter()
             self.signal_repository = SignalRepository()
             self.file_storage = FileStorage()
+
+            # 依赖注入：将Infrastructure组件注入到Application层
+            # 符合DDD架构，UI层通过Application层访问Infrastructure层
             self.signal_service = SignalService(
-                validator=self.signal_validator,
                 processor=self.signal_processor,
-                repository=self.signal_repository,
                 excel_reader=self.excel_reader,
-                thread_pool=self.thread_pool
+                plotter=self.signal_plotter,
+                file_storage=self.file_storage
             )
             
-            # 初始化事件处理器（移除event_bus参数）
+            # 初始化事件处理器，注入SignalService符合DDD分层架构
             self.signal_import_handler = SignalImportHandler()
-            self.slice_handler = SignalSliceHandler()
+            self.slice_handler = SignalSliceHandler(self.signal_service)
             
             # 设置窗口基本属性
             self._setup_window()
@@ -332,10 +334,10 @@ class MainWindow(QMainWindow):
             self.browse_btn.clicked.connect(self._on_browse_import)
             self.import_btn.clicked.connect(self._on_import_data)
             
-            # 导入处理器信号
+            # 导入处理器信号 - 使用统一的信号命名
             self.signal_import_handler.import_started.connect(self._on_import_started)
-            self.signal_import_handler.import_finished.connect(self._on_import_completed)
-            self.signal_import_handler.import_error.connect(self._on_import_error)
+            self.signal_import_handler.import_completed.connect(self._on_import_completed)
+            self.signal_import_handler.import_failed.connect(self._on_import_error)
             self.signal_import_handler.file_selected.connect(self._on_file_selected)
             
             # 切片按钮信号
@@ -346,6 +348,7 @@ class MainWindow(QMainWindow):
             self.slice_handler.slice_started.connect(self._on_slice_started)
             self.slice_handler.slice_completed.connect(self._on_slice_completed)
             self.slice_handler.slice_failed.connect(self._on_slice_error)
+            self.slice_handler.slice_display_ready.connect(self._on_slice_display_ready)
             
             ui_logger.debug("信号连接设置完成")
             
@@ -604,7 +607,8 @@ class MainWindow(QMainWindow):
                         )
                     
                     # 显示第一个切片
-                    if self.slice_handler.current_slice_index == -1:
+                    current_index, _ = self.signal_service.get_slice_info()
+                    if current_index == 0:  # 还没有显示任何切片
                         self.slice_handler.show_next_slice(self)
                         
         except Exception as e:
@@ -633,29 +637,45 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "警告", "请先导入信号数据")
                 return
 
-            # 调用切片处理器，传递必需的 signal 参数
-            self.slice_handler.start_slice(self, signal)
+            # 调用切片处理器，符合DDD分层架构：不传递UI层实例
+            self.slice_handler.start_slice(
+                signal=signal,
+                thread_pool=self.thread_pool,
+                message_callback=self._show_message_box
+            )
             
         except Exception as e:
             ui_logger.error(f"处理开始切片事件时出错: {str(e)}")
 
     def _on_next_slice(self) -> None:
-        """下一个切片按钮点击事件处理"""
+        """下一个切片按钮点击事件处理
+
+        UI层专注于用户交互，通过Handler层请求下一个切片数据。
+        预防性设计：正常情况下按钮应该在最后一个切片时被禁用，
+        因此这个方法不应该在没有更多切片时被调用。
+        符合DDD分层架构原则。
+        """
         try:
-            # self._start_loading_animation()
-            success = self.slice_handler.show_next_slice(self)
-            # self._stop_loading_animation()
-            
-            if not success:
-                QMessageBox.information(self, "提示", "已经是最后一个切片")
+            # 预防性检查：按钮应该已经被禁用，这是额外的安全检查
+            if self.signal_service.is_last_slice():
+                ui_logger.warning("'下一片'按钮在最后一个切片时被点击，这不应该发生")
                 self.next_slice_btn.setEnabled(False)
+                return
+
+            # 通过Handler层请求下一个切片，符合DDD分层架构
+            success = self.slice_handler.request_next_slice()
+
+            # 如果请求失败，记录日志但不显示错误对话框（预防性设计）
+            if not success:
+                ui_logger.debug("下一个切片请求失败，可能已到达最后一个切片")
+
         except Exception as e:
             ui_logger.error(f"处理下一个切片事件时出错: {str(e)}")
-            self._stop_loading_animation()
+            QMessageBox.critical(self, "错误", f"切片导航出错: {str(e)}")
 
     def _show_slice_result(self, success: bool) -> None:
         """显示切片结果对话框
-        
+
         Args:
             success: 是否成功
         """
@@ -665,48 +685,102 @@ class MainWindow(QMainWindow):
         except Exception as e:
             ui_logger.error(f"显示切片结果对话框失败: {str(e)}")
 
-    def _update_slice_display(self, slice_data: SignalSlice) -> None:
+    def _on_slice_display_ready(self, slice_data) -> None:
+        """切片显示就绪的槽函数
+
+        当Handler层准备好切片数据时，UI层负责更新界面显示。
+        实现预防性按钮状态管理：检查是否为最后一个切片并相应设置按钮状态。
+        符合DDD分层架构原则：UI层专注界面更新。
+
+        Args:
+            slice_data: 切片数据对象
+        """
+        try:
+            # UI层专注于界面更新
+            self.update_slice_display(slice_data)
+
+            # 预防性按钮状态管理：检查是否为最后一个切片
+            is_last = self.signal_service.is_last_slice()
+            self.next_slice_btn.setEnabled(not is_last)
+
+            # 记录按钮状态变化
+            current_index, total_count = self.signal_service.get_slice_info()
+            if is_last:
+                ui_logger.debug(f"已显示最后一个切片 ({current_index}/{total_count})，禁用'下一片'按钮")
+            else:
+                ui_logger.debug(f"显示切片 ({current_index}/{total_count})，'下一片'按钮保持启用")
+
+        except Exception as e:
+            ui_logger.error(f"处理切片显示就绪事件时出错: {str(e)}")
+
+    def _show_message_box(self, title: str, message: str, icon_type) -> None:
+        """显示消息框的辅助方法
+
+        用于Handler层回调显示消息，避免Handler层直接依赖UI组件。
+
+        Args:
+            title: 消息框标题
+            message: 消息内容
+            icon_type: 消息框图标类型
+        """
+        QMessageBox(icon_type, title, message, QMessageBox.Ok, self).exec_()
+
+
+
+    def update_slice_display(self, slice_data: SignalSlice) -> None:
         """更新切片显示
-        
+
+        UI层专注于界面更新，业务流程协调由Application层（SignalService）负责。
+        符合DDD分层架构和单一职责原则。
+
         Args:
             slice_data: 切片数据
         """
         try:
-            # 更新左侧图像
-            if hasattr(self, 'left_plots'):
-                # 获取当前切片序号
-                current_index = self.slice_handler.current_slice_index
-                total_count = len(self.slice_handler.current_slices or [])
-                
-                # 更新左侧标题
-                self.left_title.setText(f"第{current_index + 1}个切片数据 原始图像")
-                
-                # 生成并保存图像
-                signal = self.signal_service.get_current_signal()
-                if signal and slice_data:
-                    # 更新绘图服务的波段配置
-                    self.signal_plotter.update_band_config(signal.band_type)
-                    
-                    # 生成图像数据
-                    image_data = self.signal_plotter.plot_slice(slice_data.data)
-                    
-                    # 保存图像
-                    image_paths = self.file_storage.save_slice_images(
-                        image_data=image_data,
-                        slice_idx=current_index + 1,
-                        is_temp=False
-                    )
-                    
-                    # 按顺序显示5张图像
-                    plot_types = ['CF', 'PW', 'PA', 'DTOA', 'DOA']
-                    for i, plot_type in enumerate(plot_types):
-                        if i < len(self.left_plots):
-                            image_path = image_paths.get(plot_type)
-                            if image_path and Path(image_path).exists():
-                                self.left_plots[i].display_image(image_path)
-                            else:
-                                self.left_plots[i].clear()
+            # 通过Application层获取显示数据，遵循DDD分层原则
+            display_data = self.signal_service.prepare_slice_display_data(slice_data)
+
+            if not display_data['success']:
+                ui_logger.error(f"获取切片显示数据失败: {display_data['error_message']}")
+                return
+
+            # UI层只负责界面组件更新
+            self._update_left_slice_images(display_data)
+
+            ui_logger.debug(f"切片显示更新完成: {display_data['current_index']}/{display_data['total_count']}")
 
         except Exception as e:
-            ui_logger.error(f"更新切片显示时出错: {str(e)}")
+            ui_logger.error(f"切片显示更新失败: {str(e)}")
+            # 不重新抛出异常，避免影响Handler层的流程
+
+    def _update_left_slice_images(self, display_data: Dict[str, any]) -> None:
+        """更新左侧切片图像显示区域
+
+        私有方法，专门负责更新左侧切片图像显示区域，包括：
+        - 切片标题文本
+        - 5张切片图像（CF、PW、PA、DTOA、DOA）
+
+        Args:
+            display_data: 显示数据字典，包含标题和图像路径信息
+        """
+        try:
+            # 更新左侧切片图像显示区域
+            if hasattr(self, 'left_plots'):
+                # 更新切片标题
+                self.left_title.setText(display_data['title'])
+
+                # 按顺序显示5张切片图像（CF、PW、PA、DTOA、DOA）
+                plot_types = ['CF', 'PW', 'PA', 'DTOA', 'DOA']
+                image_paths = display_data['image_paths']
+
+                for i, plot_type in enumerate(plot_types):
+                    if i < len(self.left_plots):
+                        image_path = image_paths.get(plot_type)
+                        if image_path:
+                            self.left_plots[i].display_image(image_path)
+                        else:
+                            self.left_plots[i].clear()
+
+        except Exception as e:
+            ui_logger.error(f"更新左侧切片图像显示失败: {str(e)}")
             raise

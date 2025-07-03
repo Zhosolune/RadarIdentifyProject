@@ -21,18 +21,18 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
     
     Signals:
         import_started: 导入开始信号
-        import_finished: 导入完成信号，携带成功标志
-        import_error: 导入错误信号，携带错误信息
+        import_completed: 导入完成信号，携带成功标志
+        import_failed: 导入失败信号，携带错误信息
         file_selected: 文件选择完成信号，携带文件路径
         
     Attributes:
         event_bus (EventBus): 事件总线实例
     """
     
-    # 定义Qt信号
+    # 定义Qt信号 - 统一命名格式：{功能}_{动作}_{状态}
     import_started = pyqtSignal()
-    import_finished = pyqtSignal(bool)  # 参数为是否成功
-    import_error = pyqtSignal(str)  # 参数为错误信息
+    import_completed = pyqtSignal(bool)  # 参数为是否成功
+    import_failed = pyqtSignal(str)  # 参数为错误信息
     file_selected = pyqtSignal(str)  # 参数为文件路径
     
     def __init__(self):
@@ -139,18 +139,18 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
             if success and signal:
                 ui_logger.info(f"导入任务完成: {signal.id}")
                 # 发射导入成功信号
-                self.safe_emit_signal(self.import_finished, True)
+                self.safe_emit_signal(self.import_completed, True)
             else:
                 ui_logger.error(f"导入任务失败: {message}")
                 # 发射导入失败信号
-                self.safe_emit_signal(self.import_error, message)
-                self.safe_emit_signal(self.import_finished, False)
+                self.safe_emit_signal(self.import_failed, message)
+                self.safe_emit_signal(self.import_completed, False)
 
         except Exception as e:
             error_msg = f"处理导入结果时出错: {str(e)}"
             ui_logger.error(error_msg)
-            self.safe_emit_signal(self.import_error, error_msg)
-            self.safe_emit_signal(self.import_finished, False)
+            self.safe_emit_signal(self.import_failed, error_msg)
+            self.safe_emit_signal(self.import_completed, False)
 
     def cleanup(self) -> None:
         """清理资源"""
