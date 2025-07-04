@@ -1,0 +1,187 @@
+---
+alwaysApply: true
+---
+# 代码质量和最佳实践规范
+
+## 注释规范
+添加注释时不允许更改任何代码内容，不要删除原有的注释内容:
+
+✅ **正确示例** - 适当的注释:
+```python
+class SignalProcessor:
+    """信号处理服务
+    
+    负责信号数据的处理，包括切片、验证等功能。
+    """
+    
+    def slice_signal(self, signal: SignalData) -> List[SignalSlice]:
+        """对信号数据进行切片
+        
+        Args:
+            signal: 待切片的信号数据
+            
+        Returns:
+            List[SignalSlice]: 切片列表
+        """
+        # 添加注释时不允许更改任何代码内容
+        # 添加注释时不要删除原有的注释内容
+        pass
+```
+
+❌ **错误示例** - 过度注释或无用注释:
+```python
+def add(a, b):
+    # 这个函数将两个数相加  # 不必要的注释
+    return a + b
+```
+
+## 类型提示规范
+必须使用类型提示，提高代码可读性:
+
+✅ **正确示例** - 使用类型提示:
+```python
+from typing import Optional, List, Tuple, Dict, Any
+
+def process_signal(self, signal: SignalData) -> Tuple[bool, str, Optional[List[SignalSlice]]]:
+    """处理信号数据"""
+    pass
+
+class SignalService:
+    def __init__(self, processor: SignalProcessor):
+        self._current_signal: Optional[SignalData] = None
+```
+
+❌ **错误示例** - 缺少类型提示:
+```python
+def process_signal(self, signal):  # 缺少类型信息
+    pass
+```
+
+## 导入规范
+按照标准库、第三方库、本地导入的顺序组织:
+
+✅ **正确示例** - 有序的导入:
+```python
+"""模块文档字符串"""
+
+# 标准库导入
+import sys
+from typing import List, Optional
+from pathlib import Path
+
+# 第三方库导入
+import numpy as np
+from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtCore import pyqtSignal
+
+# 本地导入
+from radar_system.domain.signal.entities.signal import SignalData
+from radar_system.infrastructure.common.logging import system_logger
+```
+
+❌ **错误示例** - 无序的导入:
+```python
+from radar_system.domain.signal.entities.signal import SignalData
+import sys
+from PyQt5.QtWidgets import QMainWindow
+import numpy as np  # 导入顺序混乱
+```
+
+## 禁止的模式
+以下模式严格禁止在项目中使用:
+
+❌ **禁止：Handler层存储业务数据**
+```python
+class SignalSliceHandler:
+    def __init__(self):
+        self.current_slices = None  # 禁止
+```
+
+❌ **禁止：跨层调用**
+```python
+class MainWindow(QMainWindow):
+    def some_method(self):
+        result = self.signal_processor.process(data)  # 禁止UI直接调用Domain
+```
+
+❌ **禁止：在非主线程直接更新UI**
+```python
+def worker_thread_method(self):
+    self.label.setText("更新")  # 禁止
+```
+
+❌ **禁止：复杂的异常继承**
+```python
+class CustomSignalException(BaseException):  # 避免
+    pass
+```
+
+## 必须遵循的模式
+以下模式必须在项目中遵循:
+
+✅ **必须：使用统一的返回格式**
+```python
+def some_service_method(self) -> Tuple[bool, str, Optional[Any]]:
+    return True, "成功", result
+```
+
+✅ **必须：Service层管理业务数据**
+```python
+class SignalService:
+    def __init__(self):
+        self._current_signal: Optional[SignalData] = None
+```
+
+✅ **必须：线程安全的信号发射**
+```python
+class MyHandler(ThreadSafeSignalEmitter):
+    def emit_signal(self):
+        self.safe_emit_signal(self.operation_completed, True)
+```
+
+✅ **必须：适当的日志记录**
+```python
+def important_operation(self):
+    system_logger.info("开始重要操作")
+    try:
+        # 操作逻辑
+        system_logger.info("重要操作完成")
+    except Exception as e:
+        system_logger.error(f"重要操作失败: {str(e)}")
+```
+
+## 代码审查要点
+新功能开发检查清单:
+- [ ] 是否遵循了正确的分层架构？
+- [ ] 文件和类命名是否符合规范？
+- [ ] 是否使用了统一的返回格式？
+- [ ] 是否添加了适当的错误处理？
+- [ ] 是否添加了必要的日志记录？
+- [ ] UI更新是否线程安全？
+- [ ] 是否遵循了数据存储层级规范？
+
+## 文档字符串规范
+使用Google风格的文档字符串:
+```python
+def complex_method(self, param1: str, param2: int) -> Tuple[bool, str, Any]:
+    """执行复杂操作的方法
+    
+    Args:
+        param1: 参数1的描述
+        param2: 参数2的描述
+        
+    Returns:
+        Tuple[bool, str, Any]: (是否成功, 消息, 结果数据)
+        
+    Raises:
+        ValueError: 当参数无效时抛出
+    """
+    pass
+```
+
+## 性能最佳实践
+- 避免在循环中进行重复的计算
+- 使用适当的数据结构
+- 及时释放不需要的资源
+- 避免不必要的对象创建
+- 使用生成器处理大数据集

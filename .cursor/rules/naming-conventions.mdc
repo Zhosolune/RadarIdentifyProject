@@ -1,0 +1,90 @@
+---
+alwaysApply: true
+description: "RadarIdentifySystem命名规范"
+---
+
+# RadarIdentifySystem 命名规范
+
+## 文件命名规范
+- **服务类文件**: `{domain}_service.py` (如: [signal_service.py](mdc:RadarIdentifySystem/radar_system/application/services/signal_service.py))
+- **处理器文件**: `{entity}_{action}_handler.py` (如: [signal_import_handler.py](mdc:RadarIdentifySystem/radar_system/interface/handlers/signal_import_handler.py))
+- **任务文件**: `{domain}_tasks.py` (如: signal_tasks.py)
+- **实体文件**: `{entity}.py` (如: [signal.py](mdc:RadarIdentifySystem/radar_system/domain/signal/entities/signal.py))
+- **测试文件**: `test_{module_name}.py`
+
+## 类命名规范 (PascalCase)
+✅ **正确示例**:
+```python
+class SignalService:              # {Domain}Service
+class SignalImportHandler:        # {Entity}{Action}Handler  
+class SignalImportTask:           # {Entity}{Action}Task
+class SignalData:                 # {Entity}Data
+class RecognitionResult:          # {Entity}Result
+```
+
+❌ **错误示例**:
+```python
+class signal_service:             # 应使用PascalCase
+class ImportHandler:              # 缺少实体前缀
+class DataProcessor:              # 命名过于通用
+```
+
+## 方法命名规范 (snake_case)
+✅ **正确示例**:
+```python
+def start_processing():           # 公共方法：动词开头
+def get_current_data():          # 获取方法：get_开头
+def _process_data():             # 私有方法：下划线前缀
+def _on_slice_completed():       # 事件处理：_on_{event_name}
+```
+
+❌ **错误示例**:
+```python
+def ProcessData():               # 应使用snake_case
+def data():                      # 方法名应包含动词
+def handleEvent():               # 应使用下划线分隔
+```
+
+## 变量命名规范
+✅ **正确示例**:
+```python
+class MyClass:
+    def __init__(self):
+        self._member_var = None      # 成员变量：_前缀
+        
+g_global_config = {}             # 全局变量：g前缀  
+local_variable = "value"         # 局部变量：snake_case
+```
+
+❌ **错误示例**:
+```python
+class MyClass:
+    def __init__(self):
+        self.memberVar = None        # 应使用下划线和前缀
+        
+globalConfig = {}                # 全局变量应使用g前缀
+LocalVariable = "value"          # 局部变量应使用snake_case
+```
+
+## 目录结构规范
+参考: [RadarIdentifySystem](mdc:RadarIdentifySystem/radar_system)
+```
+radar_system/
+├── interface/
+│   ├── handlers/           # {entity}_{action}_handler.py
+│   ├── views/             # {component}_window.py
+│   └── styles/            # style_sheets.py
+├── application/
+│   ├── services/          # {domain}_service.py
+│   └── tasks/             # {domain}_tasks.py
+├── domain/
+│   ├── {domain}/
+│   │   ├── entities/      # {entity}.py
+│   │   ├── services/      # {service}.py
+│   │   └── repositories/  # {entity}_repository.py
+└── infrastructure/
+    ├── async_core/        # 异步处理核心
+    ├── common/            # 通用组件
+    ├── ml/                # 机器学习组件
+    └── persistence/       # 持久化组件
+```

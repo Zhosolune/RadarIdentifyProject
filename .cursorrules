@@ -1,0 +1,489 @@
+# RadarIdentifySystem项目开发规则
+
+## 项目概述
+雷达信号多维参数联合智能分类系统，采用Python + PyQt5 + TensorFlow技术栈，遵循DDD+MVC简化架构设计，基于YAGNI原则，避免过度工程化。
+
+## 1. 项目架构规则
+
+### 1.1 分层架构约束
+严格遵循四层架构，禁止跨层调用：
+```
+Interface Layer (界面层) → Application Layer (应用层) → Domain Layer (领域层) → Infrastructure Layer (基础设施层)
+```
+
+**✅ 允许的调用关系：**
+- UI层 → 应用服务层
+- 应用服务层 → 领域服务层
+- 应用服务层 → 基础设施层
+- 领域服务层 → 基础设施层（仅数据访问）
+
+**❌ 禁止的调用关系：**
+- UI层直接调用领域层
+- 领域层调用应用层
+- 任何下层调用上层
+
+### 1.2 各层职责边界
+- **Interface层**：用户交互、界面显示、Qt信号槽处理
+- **Application层**：业务流程协调、日志记录、异常处理
+- **Domain层**：纯业务逻辑、算法实现、领域实体
+- **Infrastructure层**：数据持久化、外部服务、技术组件
+
+## 2. 文件和目录命名规则
+
+### 2.1 目录结构规范
+```
+radar_system/
+├── interface/
+│   ├── handlers/           # {entity}_{action}_handler.py
+│   ├── views/             # {component}_window.py
+│   └── styles/            # style_sheets.py
+├── application/
+│   ├── services/          # {domain}_service.py
+│   └── tasks/             # {domain}_tasks.py
+├── domain/
+│   ├── {domain}/
+│   │   ├── entities/      # {entity}.py
+│   │   ├── services/      # {service}.py
+│   │   └── repositories/  # {entity}_repository.py
+└── infrastructure/
+    ├── async_core/        # 异步处理核心
+    ├── common/            # 通用组件
+    ├── ml/                # 机器学习组件
+    └── persistence/       # 持久化组件
+```
+
+### 2.2 文件命名规范
+- **服务类文件**：`{domain}_service.py` (如：signal_service.py)
+- **处理器文件**：`{entity}_{action}_handler.py` (如：signal_import_handler.py)
+- **任务文件**：`{domain}_tasks.py` (如：signal_tasks.py)
+- **实体文件**：`{entity}.py` (如：signal.py)
+- **测试文件**：`test_{module_name}.py`
+
+## 3. 类和方法命名规范
+
+### 3.1 类命名规范
+```python
+# ✅ 正确示例
+class SignalService:              # {Domain}Service
+class SignalImportHandler:        # {Entity}{Action}Handler
+class SignalImportTask:           # {Entity}{Action}Task
+class SignalData:                 # {Entity}Data
+class RecognitionResult:          # {Entity}Result
+
+# ❌ 错误示例
+class signal_service:             # 应使用PascalCase
+class ImportHandler:              # 缺少实体前缀
+class DataProcessor:              # 命名过于通用
+```
+
+### 3.2 方法命名规范
+```python
+# ✅ 正确示例
+def start_processing():           # 公共方法：动词开头
+def get_current_data():          # 获取方法：get_开头
+def _process_data():             # 私有方法：下划线前缀
+def _on_slice_completed():       # 事件处理：_on_{event_name}
+
+# ❌ 错误示例
+def ProcessData():               # 应使用snake_case
+def data():                      # 方法名应包含动词
+def handleEvent():               # 应使用下划线分隔
+```
+
+### 3.3 变量命名规范
+```python
+# ✅ 正确示例
+class MyClass:
+    def __init__(self):
+        self._member_var = None      # 成员变量：_前缀
+        
+g_global_config = {}             # 全局变量：g前缀
+local_variable = "value"         # 局部变量：snake_case
+
+# ❌ 错误示例
+class MyClass:
+    def __init__(self):
+        self.memberVar = None        # 应使用下划线和前缀
+        
+globalConfig = {}                # 全局变量应使用g前缀
+LocalVariable = "value"          # 局部变量应使用snake_case
+```
+
+## 4. PyQt5信号槽使用规范
+
+### 4.1 信号命名规范
+使用`{功能}_{动作}_{状态}`格式：
+```python
+# ✅ 正确示例
+class SignalImportHandler(QObject):
+    import_started = pyqtSignal()                    # 导入开始
+    import_completed = pyqtSignal(bool)              # 导入完成
+    import_failed = pyqtSignal(str)                  # 导入失败
+    import_progress = pyqtSignal(int, int)           # 导入进度
+
+# ❌ 错误示例
+class SignalImportHandler(QObject):
+    import_finished = pyqtSignal(bool)               # 应使用completed
+    import_error = pyqtSignal(str)                   # 应使用failed
+    importStarted = pyqtSignal()                     # 应使用下划线
+```
+
+### 4.2 线程安全信号发射
+```python
+# ✅ 正确示例 - 使用ThreadSafeSignalEmitter基类
+class MyHandler(ThreadSafeSignalEmitter):
+    def some_method(self):
+        self.safe_emit_signal(self.operation_completed, True)
+
+# ❌ 错误示例 - 在非主线程直接发射信号
+class MyHandler(QObject):
+    def some_method(self):
+        self.operation_completed.emit(True)  # 可能线程不安全
+```
+
+### 4.3 信号连接管理
+```python
+# ✅ 正确示例 - 依赖Qt自动管理
+class MainWindow(QMainWindow):
+    def _connect_signals(self):
+        self.import_handler.import_completed.connect(self._on_import_completed)
+        self.slice_handler.slice_completed.connect(self._on_slice_completed)
+
+# ❌ 错误示例 - 不必要的手动管理
+class MainWindow(QMainWindow):
+    def _connect_signals(self):
+        self._connections = []
+        conn = self.import_handler.import_completed.connect(self._on_import_completed)
+        self._connections.append(conn)  # 通常不需要
+```
+
+## 5. 数据存储和传递规则
+
+### 5.1 数据存储层级规范
+```python
+# ✅ 正确示例 - Service层存储业务数据
+class SignalService:
+    def __init__(self):
+        self.current_signal: Optional[SignalData] = None
+        self.current_slices: Optional[List[SignalSlice]] = None
+
+# Handler层只存储UI状态
+class SignalSliceHandler:
+    def __init__(self):
+        self._last_directory = None  # UI会话状态
+        # 不存储业务数据
+
+# ❌ 错误示例 - Handler层存储业务数据
+class SignalSliceHandler:
+    def __init__(self):
+        self.current_slices = None      # 违反层级职责
+        self.current_slice_index = -1   # 应在Service层
+```
+
+### 5.2 统一的返回格式
+```python
+# ✅ 所有层间调用使用统一格式：Tuple[bool, str, Optional[Any]]
+def load_signal_file(self, file_path: str) -> Tuple[bool, str, Optional[SignalData]]:
+    try:
+        signal_data = self.excel_reader.read_file(file_path)
+        return True, "文件导入成功", signal_data
+    except Exception as e:
+        return False, f"导入失败: {str(e)}", None
+
+# ❌ 错误示例 - 不一致的返回格式
+def load_signal_file(self, file_path: str) -> SignalData:
+    # 直接返回数据，无法传递错误信息
+    return self.excel_reader.read_file(file_path)
+```
+
+### 5.3 简单的依赖注入
+```python
+# ✅ 正确示例 - 构造函数注入
+class SignalService:
+    def __init__(self, processor: SignalProcessor, excel_reader: ExcelReader):
+        self.processor = processor
+        self.excel_reader = excel_reader
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        # 直接创建依赖
+        self.signal_service = SignalService(
+            processor=SignalProcessor(),
+            excel_reader=ExcelReader()
+        )
+
+# ❌ 错误示例 - 过度复杂的依赖管理
+class ServiceRegistry:
+    # 不需要复杂的注册机制
+    pass
+```
+
+## 6. 错误处理和日志规则
+
+### 6.1 错误处理规范
+```python
+# ✅ 正确示例 - 直接的错误处理
+def load_signal_file(self, file_path: str) -> Tuple[bool, str, Optional[SignalData]]:
+    try:
+        if not Path(file_path).exists():
+            return False, "找不到指定的文件，请检查文件路径是否正确", None
+            
+        signal_data = self.excel_reader.read_file(file_path)
+        return True, "文件导入成功", signal_data
+        
+    except PermissionError:
+        return False, "没有权限访问该文件，请检查文件权限", None
+    except Exception as e:
+        system_logger.error(f"文件导入技术错误: {str(e)}")
+        return False, "文件导入失败，请检查文件格式是否正确", None
+
+# ❌ 错误示例 - 复杂的异常层次
+class CustomException(Exception):
+    # 避免过度的自定义异常类
+    pass
+```
+
+### 6.2 日志记录规范
+```python
+# ✅ 正确示例 - 标准化日志记录
+class SignalService:
+    def start_slice_processing(self, signal: SignalData):
+        system_logger.info(f"开始信号切片处理: {signal.id}")
+        
+        try:
+            slices = self.processor.slice_signal(signal)
+            system_logger.info(f"信号切片处理完成: {signal.id}, 切片数量: {len(slices)}")
+            return True, "切片处理完成", slices
+        except Exception as e:
+            system_logger.error(f"信号切片处理失败: {signal.id}, 错误: {str(e)}")
+            return False, str(e), None
+
+# ❌ 错误示例 - 不一致的日志格式
+def some_method(self):
+    print("开始处理")  # 应使用logger
+    logger.debug("Processing")  # 缺少上下文信息
+```
+
+### 6.3 用户友好的错误消息
+```python
+# ✅ 在业务逻辑中直接返回用户友好消息
+def validate_signal_data(self, data):
+    if data is None:
+        return False, "信号数据不能为空", None
+    if len(data) == 0:
+        return False, "信号数据文件为空，请检查文件内容", None
+    if data.shape[1] != 5:
+        return False, "信号数据格式不正确，应包含5个维度的数据", None
+    return True, "数据验证通过", data
+
+# ❌ 错误示例 - 技术性错误消息
+def validate_signal_data(self, data):
+    if data.shape[1] != 5:
+        return False, "ValueError: invalid array dimensions", None
+```
+
+## 7. 异步处理和任务规则
+
+### 7.1 异步任务实现模式
+```python
+# ✅ 正确示例 - 任务基类和具体实现
+@dataclass
+class SignalProcessingTask:
+    signal_data: SignalData
+    service: SignalService
+    operation_type: str
+
+    def execute(self) -> Tuple[bool, str, Optional[Any]]:
+        try:
+            if self.operation_type == "slice":
+                return self.service.start_slice_processing(self.signal_data)
+            else:
+                return False, f"不支持的操作类型: {self.operation_type}", None
+        except Exception as e:
+            return False, f"任务执行失败: {str(e)}", None
+
+# ❌ 错误示例 - 复杂的任务继承层次
+class BaseTask(ABC):
+    # 避免过度抽象的基类
+    pass
+```
+
+### 7.2 线程池使用规范
+```python
+# ✅ 正确示例 - 简单的线程池管理
+class MainWindow(QMainWindow):
+    def __init__(self):
+        self.thread_pool = ThreadPoolExecutor(max_workers=4)
+        
+    def submit_task(self, task):
+        future = self.thread_pool.submit(task.execute)
+        future.add_done_callback(self._handle_task_result)
+        return future
+
+# ❌ 错误示例 - 过度复杂的线程池封装
+class ComplexThreadPoolManager:
+    # 避免不必要的包装层
+    pass
+```
+
+### 7.3 任务结果处理
+```python
+# ✅ 正确示例 - 统一的结果处理
+def _handle_task_result(self, future):
+    try:
+        success, message, result = future.result()
+        if success:
+            self.safe_emit_signal(self.operation_completed, True, result)
+        else:
+            self.safe_emit_signal(self.operation_failed, message)
+    except Exception as e:
+        error_msg = f"处理任务结果时出错: {str(e)}"
+        self.safe_emit_signal(self.operation_failed, error_msg)
+
+# ❌ 错误示例 - 不一致的结果处理
+def _handle_task_result(self, future):
+    result = future.result()  # 没有统一的错误处理
+    self.update_ui(result)    # 直接UI更新，非线程安全
+```
+
+## 8. 代码质量和最佳实践
+
+### 8.1 注释规范
+```python
+# ✅ 正确示例 - 适当的注释
+class SignalProcessor:
+    """信号处理服务
+    
+    负责信号数据的处理，包括切片、验证等功能。
+    """
+    
+    def slice_signal(self, signal: SignalData) -> List[SignalSlice]:
+        """对信号数据进行切片
+        
+        Args:
+            signal: 待切片的信号数据
+            
+        Returns:
+            List[SignalSlice]: 切片列表
+        """
+        # 添加注释时不允许更改任何代码内容
+        # 添加注释时不要删除原有的注释内容
+        pass
+
+# ❌ 错误示例 - 过度注释或无用注释
+def add(a, b):
+    # 这个函数将两个数相加  # 不必要的注释
+    return a + b
+```
+
+### 8.2 类型提示规范
+```python
+# ✅ 正确示例 - 使用类型提示
+from typing import Optional, List, Tuple, Dict, Any
+
+def process_signal(self, signal: SignalData) -> Tuple[bool, str, Optional[List[SignalSlice]]]:
+    """处理信号数据"""
+    pass
+
+class SignalService:
+    def __init__(self, processor: SignalProcessor):
+        self._current_signal: Optional[SignalData] = None
+
+# ❌ 错误示例 - 缺少类型提示
+def process_signal(self, signal):  # 缺少类型信息
+    pass
+```
+
+### 8.3 导入规范
+```python
+# ✅ 正确示例 - 有序的导入
+"""模块文档字符串"""
+
+# 标准库导入
+import sys
+from typing import List, Optional
+from pathlib import Path
+
+# 第三方库导入
+import numpy as np
+from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtCore import pyqtSignal
+
+# 本地导入
+from radar_system.domain.signal.entities.signal import SignalData
+from radar_system.infrastructure.common.logging import system_logger
+
+# ❌ 错误示例 - 无序的导入
+from radar_system.domain.signal.entities.signal import SignalData
+import sys
+from PyQt5.QtWidgets import QMainWindow
+import numpy as np  # 导入顺序混乱
+```
+
+## 9. 禁止和必须遵循的规则
+
+### 9.1 禁止的模式
+```python
+# ❌ 禁止：Handler层存储业务数据
+class SignalSliceHandler:
+    def __init__(self):
+        self.current_slices = None  # 禁止
+
+# ❌ 禁止：跨层调用
+class MainWindow(QMainWindow):
+    def some_method(self):
+        result = self.signal_processor.process(data)  # 禁止UI直接调用Domain
+
+# ❌ 禁止：在非主线程直接更新UI
+def worker_thread_method(self):
+    self.label.setText("更新")  # 禁止
+
+# ❌ 禁止：复杂的异常继承
+class CustomSignalException(BaseException):  # 避免
+    pass
+```
+
+### 9.2 必须遵循的模式
+```python
+# ✅ 必须：使用统一的返回格式
+def some_service_method(self) -> Tuple[bool, str, Optional[Any]]:
+    return True, "成功", result
+
+# ✅ 必须：Service层管理业务数据
+class SignalService:
+    def __init__(self):
+        self.current_signal: Optional[SignalData] = None
+
+# ✅ 必须：线程安全的信号发射
+class MyHandler(ThreadSafeSignalEmitter):
+    def emit_signal(self):
+        self.safe_emit_signal(self.operation_completed, True)
+
+# ✅ 必须：适当的日志记录
+def important_operation(self):
+    system_logger.info("开始重要操作")
+    try:
+        # 操作逻辑
+        system_logger.info("重要操作完成")
+    except Exception as e:
+        system_logger.error(f"重要操作失败: {str(e)}")
+```
+
+## 10. 开发流程规范
+
+### 10.1 新功能开发检查清单
+- [ ] 是否遵循了正确的分层架构？
+- [ ] 文件和类命名是否符合规范？
+- [ ] 是否使用了统一的返回格式？
+- [ ] 是否添加了适当的错误处理？
+- [ ] 是否添加了必要的日志记录？
+- [ ] UI更新是否线程安全？
+- [ ] 是否遵循了数据存储层级规范？
+
+### 10.2 代码审查要点
+- 检查层次调用关系是否正确
+- 验证信号槽命名是否统一
+- 确认错误处理是否完整
+- 检查是否有不必要的复杂性
+
+遵循这些规则将确保RadarIdentifySystem项目的代码质量、架构一致性和维护性。 

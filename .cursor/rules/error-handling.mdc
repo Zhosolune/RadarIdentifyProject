@@ -1,0 +1,113 @@
+---
+alwaysApply: true
+---
+# 错误处理和日志记录规范
+
+## 统一返回格式
+所有层间调用必须使用统一格式: `Tuple[bool, str, Optional[Any]]`
+
+参考 [signal_service.py](mdc:RadarIdentifySystem/radar_system/application/services/signal_service.py):
+
+✅ **正确示例**:
+```python
+def load_signal_file(self, file_path: str) -> Tuple[bool, str, Optional[SignalData]]:
+    try:
+        signal_data = self.excel_reader.read_file(file_path)
+        return True, "文件导入成功", signal_data
+    except Exception as e:
+        return False, f"导入失败: {str(e)}", None
+```
+
+❌ **错误示例**:
+```python
+def load_signal_file(self, file_path: str) -> SignalData:
+    # 直接返回数据，无法传递错误信息
+    return self.excel_reader.read_file(file_path)
+```
+
+## 直接错误处理
+避免复杂的异常层次，使用直接的try-catch:
+
+✅ **正确示例**:
+```python
+def load_signal_file(self, file_path: str) -> Tuple[bool, str, Optional[SignalData]]:
+    try:
+        if not Path(file_path).exists():
+            return False, "找不到指定的文件，请检查文件路径是否正确", None
+            
+        signal_data = self.excel_reader.read_file(file_path)
+        return True, "文件导入成功", signal_data
+        
+    except PermissionError:
+        return False, "没有权限访问该文件，请检查文件权限", None
+    except Exception as e:
+        system_logger.error(f"文件导入技术错误: {str(e)}")
+        return False, "文件导入失败，请检查文件格式是否正确", None
+```
+
+❌ **错误示例** - 复杂的异常层次:
+```python
+class CustomException(Exception):
+    # 避免过度的自定义异常类
+    pass
+```
+
+## 标准化日志记录
+使用 [logging.py](mdc:RadarIdentifySystem/radar_system/infrastructure/common/logging.py) 中的system_logger:
+
+✅ **正确示例**:
+```python
+class SignalService:
+    def start_slice_processing(self, signal: SignalData):
+        system_logger.info(f"开始信号切片处理: {signal.id}")
+        
+        try:
+            slices = self.processor.slice_signal(signal)
+            system_logger.info(f"信号切片处理完成: {signal.id}, 切片数量: {len(slices)}")
+            return True, "切片处理完成", slices
+        except Exception as e:
+            system_logger.error(f"信号切片处理失败: {signal.id}, 错误: {str(e)}")
+            return False, str(e), None
+```
+
+❌ **错误示例**:
+```python
+def some_method(self):
+    print("开始处理")  # 应使用logger
+    logger.debug("Processing")  # 缺少上下文信息
+```
+
+## 用户友好的错误消息
+在业务逻辑中直接返回用户友好消息:
+
+✅ **正确示例**:
+```python
+def validate_signal_data(self, data):
+    if data is None:
+        return False, "信号数据不能为空", None
+    if len(data) == 0:
+        return False, "信号数据文件为空，请检查文件内容", None
+    if data.shape[1] != 5:
+        return False, "信号数据格式不正确，应包含5个维度的数据", None
+    return True, "数据验证通过", data
+```
+
+❌ **错误示例** - 技术性错误消息:
+```python
+def validate_signal_data(self, data):
+    if data.shape[1] != 5:
+        return False, "ValueError: invalid array dimensions", None
+```
+
+## 日志级别使用规范
+- **INFO**: 记录业务流程关键节点
+- **ERROR**: 记录异常和错误信息
+- **DEBUG**: 记录详细的技术信息（仅用于调试）
+- **WARNING**: 记录潜在问题
+
+## 异常处理最佳实践
+1. 总是记录技术错误到日志
+2. 返回用户友好的错误消息
+3. 使用具体的异常类型捕获（如PermissionError）
+4. 避免裸露的except子句
+5. 确保资源正确释放
