@@ -1,0 +1,44 @@
+---
+alwaysApply: true
+description: "RadarIdentifySystem项目分层架构规则"
+---
+
+# RadarIdentifySystem 分层架构规则
+
+## 项目概述
+雷达信号多维参数联合智能分类系统，采用Python + PyQt5 + TensorFlow技术栈，遵循DDD+MVC简化架构设计。
+
+## 严格的分层架构约束
+
+### 四层架构结构
+```
+Interface Layer (界面层) → Application Layer (应用层) → Domain Layer (领域层) → Infrastructure Layer (基础设施层)
+```
+
+### 各层职责
+- **Interface层** ([main_window.py](mdc:RadarIdentifySystem/radar_system/interface/views/main_window.py)): 用户交互、界面显示、Qt信号槽处理
+- **Application层** ([signal_service.py](mdc:RadarIdentifySystem/radar_system/application/services/signal_service.py)): 业务流程协调、日志记录、异常处理  
+- **Domain层** ([processor.py](mdc:RadarIdentifySystem/radar_system/domain/signal/services/processor.py)): 纯业务逻辑、算法实现、领域实体
+- **Infrastructure层** ([excel/reader.py](mdc:RadarIdentifySystem/radar_system/infrastructure/persistence/excel/reader.py)): 数据持久化、外部服务、技术组件
+
+### 允许的调用关系
+✅ **正确调用**:
+- UI层 → 应用服务层  
+- 应用服务层 → 领域服务层
+- 应用服务层 → 基础设施层
+- 领域服务层 → 基础设施层（仅数据访问）
+
+### 禁止的调用关系  
+❌ **禁止调用**:
+- UI层直接调用领域层
+- 领域层调用应用层  
+- 任何下层调用上层
+
+### 数据存储层级
+- **Service层**: 存储业务数据 (current_signal, current_slices)
+- **Handler层**: 只存储UI状态 (_last_directory, _ui_state)
+
+## 关键实现要点
+- 所有方法返回统一格式: `Tuple[bool, str, Optional[Any]]`
+- 使用简单的构造函数依赖注入
+- 遵循YAGNI原则，避免过度工程化

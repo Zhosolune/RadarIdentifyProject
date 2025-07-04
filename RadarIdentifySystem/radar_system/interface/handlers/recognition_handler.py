@@ -91,16 +91,10 @@ class RecognitionHandler(ThreadSafeSignalEmitter):
             )
         )
         
-        # 连接任务管理相关信号
-        self._recognition_service.task_status_changed.connect(
-            lambda task_id, status: self.emit_signal(
-                self.task_status_changed, task_id, status
-            )
-        )
-        
+        # 连接队列状态信号
         self._recognition_service.queue_status_changed.connect(
-            lambda total, active: self.emit_signal(
-                self.queue_status_updated, total, active
+            lambda pending, running, completed: self.emit_signal(
+                self.queue_status_updated, pending + running, running
             )
         )
     

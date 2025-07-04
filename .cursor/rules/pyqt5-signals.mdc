@@ -1,0 +1,79 @@
+---
+alwaysApply: true
+---
+# PyQt5信号槽使用规范
+
+## 信号命名格式
+使用 `{功能}_{动作}_{状态}` 格式，参考 [signal_import_handler.py](mdc:RadarIdentifySystem/radar_system/interface/handlers/signal_import_handler.py):
+
+✅ **正确示例**:
+```python
+class SignalImportHandler(QObject):
+    import_started = pyqtSignal()                    # 导入开始
+    import_completed = pyqtSignal(bool)              # 导入完成
+    import_failed = pyqtSignal(str)                  # 导入失败
+    import_progress = pyqtSignal(int, int)           # 导入进度
+```
+
+❌ **错误示例**:
+```python
+class SignalImportHandler(QObject):
+    import_finished = pyqtSignal(bool)               # 应使用completed
+    import_error = pyqtSignal(str)                   # 应使用failed
+    importStarted = pyqtSignal()                     # 应使用下划线
+```
+
+## 线程安全信号发射
+必须使用ThreadSafeSignalEmitter基类，参考 [thread_safe_signal_emitter.py](mdc:RadarIdentifySystem/radar_system/infrastructure/common/thread_safe_signal_emitter.py):
+
+✅ **正确示例**:
+```python
+class MyHandler(ThreadSafeSignalEmitter):
+    def some_method(self):
+        self.safe_emit_signal(self.operation_completed, True)
+```
+
+❌ **错误示例** - 在非主线程直接发射信号:
+```python
+class MyHandler(QObject):
+    def some_method(self):
+        self.operation_completed.emit(True)  # 可能线程不安全
+```
+
+## 信号连接管理
+依赖Qt自动管理连接，无需手动管理连接生命周期:
+
+✅ **正确示例**:
+```python
+class MainWindow(QMainWindow):
+    def _connect_signals(self):
+        self.import_handler.import_completed.connect(self._on_import_completed)
+        self.slice_handler.slice_completed.connect(self._on_slice_completed)
+```
+
+❌ **错误示例** - 不必要的手动管理:
+```python
+class MainWindow(QMainWindow):
+    def _connect_signals(self):
+        self._connections = []
+        conn = self.import_handler.import_completed.connect(self._on_import_completed)
+        self._connections.append(conn)  # 通常不需要
+```
+
+## 信号参数标准格式
+- **开始信号**: 无参数 `pyqtSignal()`
+- **完成信号**: bool(成功标志) + 可选结果参数 `pyqtSignal(bool)` 或 `pyqtSignal(bool, int)`
+- **失败信号**: str(错误信息) `pyqtSignal(str)`
+- **进度信号**: int(当前进度), int(总进度) `pyqtSignal(int, int)`
+
+## 事件处理方法命名
+使用 `_on_{event_name}` 格式:
+```python
+def _on_import_completed(self, success: bool):
+    """处理导入完成事件"""
+    pass
+
+def _on_slice_failed(self, error: str):
+    """处理切片失败事件"""
+    pass
+```

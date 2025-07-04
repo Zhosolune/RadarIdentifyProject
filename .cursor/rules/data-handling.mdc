@@ -1,0 +1,207 @@
+---
+alwaysApply: true
+---
+# 数据存储和传递规范
+
+## 数据存储层级规范
+严格遵循数据存储的职责分离原则:
+
+参考 [signal_service.py](mdc:RadarIdentifySystem/radar_system/application/services/signal_service.py) 和各Handler文件:
+
+✅ **正确示例** - Service层存储业务数据:
+```python
+class SignalService:
+    def __init__(self):
+        self._current_signal: Optional[SignalData] = None
+        self._current_slices: Optional[List[SignalSlice]] = None
+```
+
+✅ **正确示例** - Handler层只存储UI状态:
+```python
+class SignalSliceHandler:
+    def __init__(self):
+        self._last_directory = None  # UI会话状态
+        # 不存储业务数据
+```
+
+❌ **错误示例** - Handler层存储业务数据:
+```python
+class SignalSliceHandler:
+    def __init__(self):
+        self.current_slices = None      # 违反层级职责
+        self.current_slice_index = -1   # 应在Service层
+```
+
+## 统一的返回格式
+所有层间调用使用统一格式：`Tuple[bool, str, Optional[Any]]`
+
+✅ **正确示例**:
+```python
+def load_signal_file(self, file_path: str) -> Tuple[bool, str, Optional[SignalData]]:
+    try:
+        signal_data = self.excel_reader.read_file(file_path)
+        return True, "文件导入成功", signal_data
+    except Exception as e:
+        return False, f"导入失败: {str(e)}", None
+```
+
+❌ **错误示例** - 不一致的返回格式:
+```python
+def load_signal_file(self, file_path: str) -> SignalData:
+    # 直接返回数据，无法传递错误信息
+    return self.excel_reader.read_file(file_path)
+```
+
+## 简单的依赖注入
+使用构造函数注入，避免复杂的依赖管理:
+
+✅ **正确示例** - 构造函数注入:
+```python
+class SignalService:
+    def __init__(self, processor: SignalProcessor, excel_reader: ExcelReader):
+        self._processor = processor
+        self._excel_reader = excel_reader
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        # 直接创建依赖
+        self._signal_service = SignalService(
+            processor=SignalProcessor(),
+            excel_reader=ExcelReader()
+        )
+```
+
+❌ **错误示例** - 过度复杂的依赖管理:
+```python
+class ServiceRegistry:
+    # 不需要复杂的注册机制
+    pass
+```
+
+## 数据实体设计规范
+参考 [signal.py](mdc:RadarIdentifySystem/radar_system/domain/signal/entities/signal.py):
+
+使用dataclass定义数据实体:
+```python
+@dataclass
+class SignalData:
+    """雷达信号数据实体"""
+    id: str
+    cf_data: np.ndarray  # 载频数据
+    pw_data: np.ndarray  # 脉冲宽度数据
+    doa_data: np.ndarray # 到达角数据
+    pa_data: np.ndarray  # 脉冲幅度数据
+    toa_data: np.ndarray # 到达时间数据
+    source_file: Optional[str] = None
+    import_time: Optional[datetime] = None
+
+    def __post_init__(self):
+        """数据验证和后处理"""
+        if self.import_time is None:
+            self.import_time = datetime.now()
+```
+
+## 数据传递最佳实践
+
+### 1. 跨层数据传递
+- Interface层 → Application层：传递UI输入参数
+- Application层 → Domain层：传递业务实体
+- Application层 → Infrastructure层：传递持久化数据
+
+### 2. 数据验证原则
+- 在数据进入系统的边界进行验证
+- Domain层不依赖外部验证
+- 使用类型提示确保数据契约
+
+### 3. 数据转换规范
+```python
+class DataConverter:
+    """数据转换工具类"""
+    
+    @staticmethod
+    def excel_to_signal_data(excel_data: pd.DataFrame) -> SignalData:
+        """Excel数据转换为信号数据实体"""
+        return SignalData(
+            id=str(uuid.uuid4()),
+            cf_data=excel_data['CF'].values,
+            pw_data=excel_data['PW'].values,
+            doa_data=excel_data['DOA'].values,
+            pa_data=excel_data['PA'].values,
+            toa_data=excel_data['TOA'].values
+        )
+```
+
+## 内存管理规范
+
+### 1. 大数据处理
+```python
+def process_large_signal(self, signal: SignalData) -> Tuple[bool, str, Optional[List[SignalSlice]]]:
+    """处理大型信号数据时的内存管理"""
+    try:
+        # 分块处理避免内存溢出
+        chunk_size = 10000
+        slices = []
+        
+        for i in range(0, len(signal.toa_data), chunk_size):
+            chunk = signal.toa_data[i:i+chunk_size]
+            chunk_slices = self._process_chunk(chunk)
+            slices.extend(chunk_slices)
+            
+        return True, "处理完成", slices
+    except MemoryError:
+        return False, "内存不足，请减少数据量", None
+```
+
+### 2. 资源释放
+```python
+def cleanup_resources(self):
+    """清理不再需要的资源"""
+    self._current_signal = None
+    self._current_slices = None
+    # 显式触发垃圾回收（在必要时）
+    import gc
+    gc.collect()
+```
+
+## 数据安全和一致性
+
+### 1. 数据不可变性
+```python
+from typing import Final
+
+class DataConstants:
+    """数据常量定义"""
+    MAX_SIGNAL_SIZE: Final[int] = 1000000
+    VALID_FREQUENCY_RANGE: Final[tuple] = (1000, 12000)
+    DEFAULT_SLICE_DURATION: Final[float] = 0.25  # 250ms
+```
+
+### 2. 数据深拷贝
+```python
+import copy
+
+def get_signal_copy(self) -> Optional[SignalData]:
+    """获取信号数据的深拷贝"""
+    if self._current_signal:
+        return copy.deepcopy(self._current_signal)
+    return None
+```
+
+## 配置数据管理
+参考 [config.py](mdc:RadarIdentifySystem/radar_system/infrastructure/common/config.py):
+
+使用配置类管理系统配置:
+```python
+@dataclass
+class AppConfig:
+    """应用配置类"""
+    max_workers: int = 4
+    log_level: str = "INFO"
+    model_path: str = "models/"
+    temp_path: str = "temp/"
+    
+    @classmethod
+    def from_file(cls, config_path: str) -> 'AppConfig':
+        """从配置文件加载配置"""
+        pass
+```
