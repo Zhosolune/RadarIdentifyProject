@@ -63,14 +63,24 @@ class RecognitionWorkflow:
             任务执行结果
         """
         workflow_logger.info(f"开始执行识别工作流 - task_id: {task.task_id}")
-        
+
         try:
             # 检查服务依赖
+            workflow_logger.info(f"正在验证服务依赖...")
+            workflow_logger.info(f"服务状态: clustering={self._clustering_service is not None}, "
+                               f"recognition={self._recognition_service is not None}, "
+                               f"parameter_extraction={self._parameter_extraction_service is not None}, "
+                               f"session={self._session_service is not None}")
+
             if not self._validate_services():
+                error_msg = "工作流服务依赖未正确设置"
+                workflow_logger.error(f"服务依赖验证失败: {error_msg}")
                 return TaskResult(
                     success=False,
-                    error_message="工作流服务依赖未正确设置"
+                    error_message=error_msg
                 )
+
+            workflow_logger.info(f"服务依赖验证通过")
             
             # 执行各个阶段
             session_id = self._execute_initialization(task)
@@ -140,15 +150,24 @@ class RecognitionWorkflow:
         task.update_stage(RecognitionStage.INITIALIZING, 0.0)
         
         try:
-            # 创建识别会话（使用模拟数据）
-            session_id = "mock_session_" + task.task_id[:8]
-            
+            # 创建时间范围（从任务参数中获取或使用默认值）
+            from radar_system.domain.signal.entities.signal import TimeRange
+            time_range = TimeRange(start_time=0.0, end_time=1.0)  # 默认时间范围
+
+            # 创建识别会话
+            session = self._session_service.create_session(
+                signal_data=task.signal_data,
+                time_range=time_range,
+                recognition_params=task.recognition_params
+            )
+            session_id = session.session_id
+
             task.update_stage(RecognitionStage.INITIALIZING, 1.0)
             task.complete_stage(RecognitionStage.INITIALIZING, {
                 'session_id': session_id,
                 'signal_data_size': len(task.signal_data) if hasattr(task.signal_data, '__len__') else 0
             })
-            
+
             workflow_logger.info(f"初始化阶段完成 - session_id: {session_id}")
             return session_id
             
@@ -160,27 +179,38 @@ class RecognitionWorkflow:
         """执行CF维度聚类阶段"""
         if not task.check_pause_and_cancel():
             return None
-        
+
         task.update_stage(RecognitionStage.CF_CLUSTERING, 0.0)
-        
+        workflow_logger.info(f"开始CF维度聚类 - session_id: {session_id}")
+
         try:
-            # 模拟CF聚类过程
-            task.update_stage(RecognitionStage.CF_CLUSTERING, 0.5)
-            
-            # 模拟聚类结果
-            cf_clusters = [f"cf_cluster_{i}" for i in range(3)]
-            
+            # 调用聚类服务执行CF维度聚类
+            task.update_stage(RecognitionStage.CF_CLUSTERING, 0.3)
+
+            # 创建时间范围（从任务参数中获取或使用默认值）
+            from radar_system.domain.signal.entities.signal import TimeRange
+            time_range = TimeRange(start_time=0.0, end_time=1.0)  # 默认时间范围
+
+            # 执行CF聚类
+            cf_cluster_candidates = self._clustering_service.cluster_cf_dimension(
+                signal_data=task.signal_data,
+                slice_index=0,  # 当前切片索引
+                time_range=time_range
+            )
+
             task.update_stage(RecognitionStage.CF_CLUSTERING, 1.0)
             task.complete_stage(RecognitionStage.CF_CLUSTERING, {
-                'cluster_count': len(cf_clusters),
-                'clusters': cf_clusters
+                'cluster_count': len(cf_cluster_candidates),
+                'clusters': [candidate.to_dict() for candidate in cf_cluster_candidates]
             })
-            
-            workflow_logger.info(f"CF聚类阶段完成 - session_id: {session_id}, 聚类数: {len(cf_clusters)}")
-            return cf_clusters
-            
+
+            workflow_logger.info(f"CF聚类阶段完成 - session_id: {session_id}, 聚类数: {len(cf_cluster_candidates)}")
+            return cf_cluster_candidates
+
         except Exception as e:
             workflow_logger.error(f"CF聚类阶段失败: {str(e)}")
+            import traceback
+            workflow_logger.error(f"异常堆栈: {traceback.format_exc()}")
             return None
     
     def _execute_cf_recognition(self, task: RecognitionTask, session_id: str, cf_clusters: List) -> Optional[List]:
@@ -191,28 +221,30 @@ class RecognitionWorkflow:
         task.update_stage(RecognitionStage.CF_RECOGNITION, 0.0)
         
         try:
-            # 模拟CF识别过程
+            # 调用识别服务执行CF维度识别
+            workflow_logger.info(f"开始CF维度识别 - session_id: {session_id}, 聚类数: {len(cf_clusters)}")
+
             cf_results = []
-            for i, cluster in enumerate(cf_clusters):
+            for i, cluster_candidate in enumerate(cf_clusters):
                 if not task.check_pause_and_cancel():
                     return None
-                
-                # 模拟识别结果
-                result = {
-                    'cluster_id': cluster,
-                    'recognition_type': f'Type_{chr(65 + i % 8)}',  # A, B, C, D, E, F, G, H
-                    'confidence': 0.85 + (i % 3) * 0.05
-                }
-                cf_results.append(result)
-                
+
+                # 调用识别服务进行识别
+                recognition_result = self._recognition_service.recognize_cf_cluster(
+                    cluster_candidate=cluster_candidate,
+                    session_id=session_id
+                )
+
+                cf_results.append(recognition_result)
+
                 progress = (i + 1) / len(cf_clusters)
                 task.update_stage(RecognitionStage.CF_RECOGNITION, progress)
-            
+
             task.complete_stage(RecognitionStage.CF_RECOGNITION, {
                 'recognition_count': len(cf_results),
-                'results': cf_results
+                'results': [result.to_dict() for result in cf_results]
             })
-            
+
             workflow_logger.info(f"CF识别阶段完成 - session_id: {session_id}, 识别数: {len(cf_results)}")
             return cf_results
             

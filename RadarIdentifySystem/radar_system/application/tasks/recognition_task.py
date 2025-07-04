@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 from PyQt5.QtCore import QObject, pyqtSignal
 from .task_enums import TaskStatus, TaskPriority, RecognitionStage
+from radar_system.infrastructure.common.thread_safe_signal_emitter import ThreadSafeSignalEmitter
 
 
 @dataclass
@@ -24,7 +25,7 @@ class TaskResult:
     stage_results: Dict[RecognitionStage, Dict[str, Any]] = field(default_factory=dict)
 
 
-class RecognitionTask(QObject):
+class RecognitionTask(ThreadSafeSignalEmitter):
     """识别任务类
     
     封装完整的雷达信号识别任务，支持异步执行、进度跟踪、暂停/恢复等功能。
@@ -142,7 +143,7 @@ class RecognitionTask(QObject):
         
         if not self._execution_callback:
             self._set_status(TaskStatus.FAILED)
-            self.task_failed.emit(self.task_id, "未设置执行回调函数")
+            self.safe_emit_signal(self.task_failed, self.task_id, "未设置执行回调函数")
             return False
         
         self._execution_thread = threading.Thread(target=self._execute, daemon=True)
@@ -192,12 +193,22 @@ class RecognitionTask(QObject):
     
     def _execute(self):
         """执行任务的内部方法"""
+        print(f"[DEBUG] RecognitionTask._execute 被调用 - task_id: {self.task_id}")
+        print(f"[DEBUG] 执行回调函数: {self._execution_callback}")
+
         try:
             self.started_at = datetime.now()
             self._set_status(TaskStatus.RUNNING)
-            
+
+            # 检查执行回调
+            if not self._execution_callback:
+                print(f"[ERROR] 执行回调函数为空！")
+                raise ValueError("执行回调函数未设置")
+
             # 执行任务
+            print(f"[DEBUG] 正在调用执行回调函数...")
             result = self._execution_callback(self)
+            print(f"[DEBUG] 执行回调函数返回结果: {result}")
             
             # 检查是否被取消
             if self._cancel_event.is_set():
@@ -210,23 +221,23 @@ class RecognitionTask(QObject):
             
             if result.success:
                 self._set_status(TaskStatus.COMPLETED)
-                self.task_completed.emit(self.task_id, result)
+                self.safe_emit_signal(self.task_completed, self.task_id, result)
             else:
                 self._set_status(TaskStatus.FAILED)
-                self.task_failed.emit(self.task_id, result.error_message or "任务执行失败")
+                self.safe_emit_signal(self.task_failed, self.task_id, result.error_message or "任务执行失败")
                 
         except Exception as e:
             self.completed_at = datetime.now()
             self._set_status(TaskStatus.FAILED)
             error_msg = f"任务执行异常: {str(e)}"
-            self.task_failed.emit(self.task_id, error_msg)
+            self.safe_emit_signal(self.task_failed, self.task_id, error_msg)
     
     def _set_status(self, new_status: TaskStatus):
         """设置任务状态并发出信号"""
         if new_status != self._status:
             old_status = self._status
             self._status = new_status
-            self.status_changed.emit(self.task_id, old_status, new_status)
+            self.safe_emit_signal(self.status_changed, self.task_id, old_status, new_status)
     
     def update_stage(self, stage: RecognitionStage, progress: float = 0.0):
         """更新当前执行阶段
@@ -240,8 +251,8 @@ class RecognitionTask(QObject):
         
         # 计算整体进度
         self._calculate_overall_progress()
-        
-        self.progress_updated.emit(self.task_id, stage, self._stage_progress)
+
+        self.safe_emit_signal(self.progress_updated, self.task_id, stage, self._stage_progress)
     
     def complete_stage(self, stage: RecognitionStage, results: Dict[str, Any]):
         """完成当前阶段
@@ -251,7 +262,7 @@ class RecognitionTask(QObject):
             results: 阶段执行结果
         """
         self._stage_results[stage] = results
-        self.stage_completed.emit(self.task_id, stage, results)
+        self.safe_emit_signal(self.stage_completed, self.task_id, stage, results)
     
     def _calculate_overall_progress(self):
         """计算整体进度"""

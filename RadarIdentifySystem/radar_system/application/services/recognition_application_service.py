@@ -268,10 +268,21 @@ class RecognitionApplicationService(QObject):
             任务执行结果
         """
         app_logger.info(f"开始执行识别任务 - task_id: {task.task_id}")
-        
+
+        # 添加调试信息
+        app_logger.info(f"任务信号数据形状: {task.signal_data.shape if task.signal_data is not None else 'None'}")
+        app_logger.info(f"任务识别参数: {task.recognition_params}")
+        app_logger.info(f"工作流对象: {self._workflow}")
+        app_logger.info(f"领域服务状态: clustering={self._clustering_service is not None}, "
+                       f"recognition={self._recognition_service is not None}, "
+                       f"parameter_extraction={self._parameter_extraction_service is not None}, "
+                       f"session={self._session_service is not None}")
+
         try:
             # 使用工作流执行任务
+            app_logger.info(f"正在调用工作流执行任务...")
             result = self._workflow.execute(task)
+            app_logger.info(f"工作流执行完成，结果: success={result.success}")
             
             if result.success:
                 app_logger.info(f"识别任务执行成功 - task_id: {task.task_id}")

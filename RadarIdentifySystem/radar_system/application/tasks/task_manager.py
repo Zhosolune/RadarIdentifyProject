@@ -12,6 +12,7 @@ from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal
 from .recognition_task import RecognitionTask, TaskResult
 from .task_enums import TaskStatus, TaskPriority
+from radar_system.infrastructure.common.thread_safe_signal_emitter import ThreadSafeSignalEmitter
 
 
 @dataclass
@@ -28,7 +29,7 @@ class TaskQueueItem:
         return self.created_at < other.created_at
 
 
-class TaskManager(QObject):
+class TaskManager(ThreadSafeSignalEmitter):
     """任务管理器
     
     负责管理识别任务的队列、执行和生命周期。
@@ -99,8 +100,13 @@ class TaskManager(QObject):
             return False
         
         # 设置执行回调
+        print(f"[DEBUG] TaskManager.submit_task - 执行回调: {self._execution_callback}")
         if self._execution_callback:
+            print(f"[DEBUG] 正在设置任务执行回调...")
             task.set_execution_callback(self._execution_callback)
+            print(f"[DEBUG] 任务执行回调设置完成")
+        else:
+            print(f"[ERROR] TaskManager 执行回调为空！")
         
         # 连接任务信号
         self._connect_task_signals(task)
@@ -115,7 +121,7 @@ class TaskManager(QObject):
             self._pending_queue.put(queue_item)
             self._all_tasks[task.task_id] = task
         
-        self.task_queued.emit(task.task_id)
+        self.safe_emit_signal(self.task_queued, task.task_id)
         self._emit_queue_status()
         
         return True
@@ -276,7 +282,7 @@ class TaskManager(QObject):
                 # 启动任务
                 if task.start():
                     self._running_tasks[task.task_id] = task
-                    self.task_started.emit(task.task_id)
+                    self.safe_emit_signal(self.task_started, task.task_id)
                     self._emit_queue_status()
                 else:
                     # 启动失败，移到完成队列
@@ -295,7 +301,7 @@ class TaskManager(QObject):
         task = self._running_tasks.pop(task_id, None)
         if task:
             self._move_to_completed(task)
-            self.task_completed.emit(task_id, True)
+            self.safe_emit_signal(self.task_completed, task_id, True)
             self._emit_queue_status()
     
     def _on_task_failed(self, task_id: str, error_message: str):
@@ -303,7 +309,7 @@ class TaskManager(QObject):
         task = self._running_tasks.pop(task_id, None)
         if task:
             self._move_to_completed(task)
-            self.task_completed.emit(task_id, False)
+            self.safe_emit_signal(self.task_completed, task_id, False)
             self._emit_queue_status()
     
     def _move_to_completed(self, task: RecognitionTask):
@@ -314,4 +320,4 @@ class TaskManager(QObject):
     def _emit_queue_status(self):
         """发出队列状态变化信号"""
         status = self.get_queue_status()
-        self.queue_status_changed.emit(status['pending'], status['running'])
+        self.safe_emit_signal(self.queue_status_changed, status['pending'], status['running'])

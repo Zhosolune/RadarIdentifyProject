@@ -62,38 +62,38 @@ class RecognitionHandler(ThreadSafeSignalEmitter):
         """连接应用服务信号到处理器信号"""
         # 连接识别相关信号
         self._recognition_service.recognition_started.connect(
-            lambda task_id, session_id: self.emit_signal(
+            lambda task_id, session_id: self.safe_emit_signal(
                 self.recognition_started, task_id, session_id
             )
         )
-        
+
         self._recognition_service.stage_progress_updated.connect(
-            lambda task_id, stage_name, progress: self.emit_signal(
+            lambda task_id, stage_name, progress: self.safe_emit_signal(
                 self.stage_progress_updated, task_id, stage_name, progress
             )
         )
-        
+
         self._recognition_service.stage_completed.connect(
-            lambda task_id, stage_name, result: self.emit_signal(
+            lambda task_id, stage_name, result: self.safe_emit_signal(
                 self.stage_completed, task_id, stage_name, result
             )
         )
-        
+
         self._recognition_service.recognition_completed.connect(
-            lambda task_id, success, result: self.emit_signal(
+            lambda task_id, success, result: self.safe_emit_signal(
                 self.recognition_completed, task_id, success, result
             )
         )
-        
+
         self._recognition_service.recognition_failed.connect(
-            lambda task_id, error_message: self.emit_signal(
+            lambda task_id, error_message: self.safe_emit_signal(
                 self.recognition_failed, task_id, error_message
             )
         )
         
         # 连接队列状态信号
         self._recognition_service.queue_status_changed.connect(
-            lambda pending, running, completed: self.emit_signal(
+            lambda pending, running, completed: self.safe_emit_signal(
                 self.queue_status_updated, pending + running, running
             )
         )

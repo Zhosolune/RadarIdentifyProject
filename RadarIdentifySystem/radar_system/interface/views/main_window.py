@@ -29,6 +29,7 @@ from radar_system.domain.signal.services.processor import SignalProcessor
 from radar_system.domain.signal.services.plotter import SignalPlotter
 from radar_system.domain.signal.repositories.signal_repository import SignalRepository
 from radar_system.infrastructure.persistence.file.file_storage import FileStorage
+from radar_system.domain.recognition.entities.recognition_params import RecognitionParams
 
 class MainWindow(QMainWindow):
     """主窗口类
@@ -84,6 +85,9 @@ class MainWindow(QMainWindow):
             # 初始化事件处理器，注入SignalService符合DDD分层架构
             self.signal_import_handler = SignalImportHandler()
             self.slice_handler = SignalSliceHandler(self.signal_service)
+
+            # 识别处理器将在app.py中通过set_recognition_handler方法设置
+            self.recognition_handler = None
             
             # 设置窗口基本属性
             self._setup_window()
@@ -343,6 +347,9 @@ class MainWindow(QMainWindow):
             # 切片按钮信号
             self.start_slice_btn.clicked.connect(self._on_start_slice)
             self.next_slice_btn.clicked.connect(self._on_next_slice)
+
+            # 识别按钮信号
+            self.identify_btn.clicked.connect(self._on_identify)
 
             # 切片相关信号
             self.slice_handler.slice_started.connect(self._on_slice_started)
@@ -784,3 +791,124 @@ class MainWindow(QMainWindow):
         except Exception as e:
             ui_logger.error(f"更新左侧切片图像显示失败: {str(e)}")
             raise
+
+    def set_recognition_handler(self, recognition_handler):
+        """设置识别处理器
+
+        Args:
+            recognition_handler: 识别处理器实例
+        """
+        self.recognition_handler = recognition_handler
+
+        # 连接识别处理器的信号到主窗口的处理函数
+        if recognition_handler:
+            recognition_handler.recognition_started.connect(self._on_recognition_started)
+            recognition_handler.recognition_completed.connect(self._on_recognition_completed)
+            recognition_handler.recognition_failed.connect(self._on_recognition_failed)
+
+        ui_logger.info("识别处理器已设置并连接信号")
+
+    def _on_identify(self) -> None:
+        """识别按钮点击事件处理"""
+        try:
+            if self.recognition_handler is None:
+                QMessageBox.warning(self, "警告", "识别处理器未初始化")
+                return
+
+            # 获取当前信号数据
+            current_signal = self.signal_service.get_current_signal()
+            if current_signal is None:
+                QMessageBox.warning(self, "警告", "请先加载并切片信号数据")
+                return
+
+            # 获取当前切片
+            current_slice = self.signal_service.get_current_slice()
+            if current_slice is None:
+                QMessageBox.warning(self, "警告", "请先进行信号切片")
+                return
+
+            ui_logger.info(f"开始识别处理 - 信号ID: {current_signal.id}, 切片索引: {current_slice.slice_index}")
+
+            # 创建默认识别参数
+            ui_logger.info("正在创建默认识别参数...")
+            recognition_params = RecognitionParams.create_default()
+            ui_logger.info("识别参数创建完成")
+
+            # 禁用识别按钮，防止重复点击
+            self.identify_btn.setEnabled(False)
+            self.identify_btn.setText("识别中...")
+
+            # 使用QTimer异步启动识别任务，避免阻塞主线程
+            ui_logger.info("正在异步启动识别任务...")
+            QTimer.singleShot(100, lambda: self._start_recognition_async(
+                current_slice.data,
+                recognition_params.to_dict()
+            ))
+
+        except Exception as e:
+            ui_logger.error(f"识别按钮处理失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"识别处理失败: {str(e)}")
+            # 恢复按钮状态
+            self.identify_btn.setEnabled(True)
+            self.identify_btn.setText("识别")
+
+    def _start_recognition_async(self, signal_data, recognition_params):
+        """异步启动识别任务"""
+        try:
+            ui_logger.info("正在调用识别处理器...")
+            task_id = self.recognition_handler.start_recognition(
+                signal_data=signal_data,
+                recognition_params=recognition_params
+            )
+            ui_logger.info(f"识别处理器调用完成，返回task_id: {task_id}")
+
+            if task_id:
+                ui_logger.info(f"识别任务已启动: {task_id}")
+            else:
+                ui_logger.warning("启动识别任务失败")
+                QMessageBox.warning(self, "警告", "启动识别任务失败")
+                # 恢复按钮状态
+                self.identify_btn.setEnabled(True)
+                self.identify_btn.setText("识别")
+
+        except Exception as e:
+            ui_logger.error(f"异步启动识别任务失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"启动识别任务失败: {str(e)}")
+            # 恢复按钮状态
+            self.identify_btn.setEnabled(True)
+            self.identify_btn.setText("识别")
+
+    def _on_recognition_started(self, task_id: str, session_id: str):
+        """识别开始事件处理"""
+        ui_logger.info(f"识别已开始 - 任务ID: {task_id}, 会话ID: {session_id}")
+
+    def _on_recognition_completed(self, task_id: str, success: bool, results: dict):
+        """识别完成事件处理"""
+        try:
+            # 恢复识别按钮状态
+            self.identify_btn.setEnabled(True)
+            self.identify_btn.setText("识别")
+
+            if success:
+                ui_logger.info(f"识别完成 - 任务ID: {task_id}")
+                QMessageBox.information(self, "成功", "信号识别完成！")
+                # TODO: 显示识别结果
+            else:
+                ui_logger.warning(f"识别失败 - 任务ID: {task_id}")
+                QMessageBox.warning(self, "警告", "信号识别失败")
+
+        except Exception as e:
+            ui_logger.error(f"处理识别完成事件失败: {str(e)}")
+
+    def _on_recognition_failed(self, task_id: str, error_message: str):
+        """识别失败事件处理"""
+        try:
+            # 恢复识别按钮状态
+            self.identify_btn.setEnabled(True)
+            self.identify_btn.setText("识别")
+
+            ui_logger.error(f"识别失败 - 任务ID: {task_id}, 错误: {error_message}")
+            QMessageBox.critical(self, "错误", f"识别失败: {error_message}")
+
+        except Exception as e:
+            ui_logger.error(f"处理识别失败事件失败: {str(e)}")
