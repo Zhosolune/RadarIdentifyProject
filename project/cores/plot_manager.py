@@ -442,6 +442,10 @@ class SignalPlotter:
             # 计算DTOA
             dtoa = np.diff(toa) * 1000  # 转换为us
             dtoa = np.append(dtoa, 0)   # 补齐长度
+
+            # 获取当前切片的时间范围
+            slice_start_time = toa[0]
+            slice_end_time = max(toa[-1], slice_start_time + 250)
             
             # 绘制并保存所有图像
             image_paths = {}
@@ -459,7 +463,7 @@ class SignalPlotter:
                 image_paths[dim_name] = self._plot_dimension(
                     toa, data, toa,
                     dim_name, base_name, self.save_dir,
-                    toa[0], toa[-1]
+                    slice_start_time, slice_end_time
                 )
             return image_paths
             

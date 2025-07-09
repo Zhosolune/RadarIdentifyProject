@@ -1,0 +1,80 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 事件总线和信号处理规则
+
+## 信号发送规则
+
+1. **单一发送点原则**：每个信号只能有一个发送点
+   - 对于异步任务：在回调函数中发送信号（如`_handle_import_result`）
+   - 对于同步操作：在操作完成后直接发送信号
+   - 事件总线处理器只负责记录日志，不直接触发UI信号
+
+2. **责任分离原则**：
+   - 事件总线处理器(`_on_xxx`)只处理日志记录和内部状态更新
+   - UI信号发送只在任务回调函数中进行
+   - 示例：[ui_handlers.py](mdc:RadarIdentifySystem/radar_system/interface/handlers/ui_handlers.py)中的`_on_import_task_completed`方法不应发送信号
+
+## 事件总线使用规则
+
+1. **事件命名规范**：
+   - 使用动词_名词格式，如`import_started`、`processing_completed`
+   - 使用过去时表示已完成的事件，如`data_loaded`
+   - 使用现在时表示正在进行的事件，如`processing_starting`
+   - 使用特定前缀区分领域，如`signal_`、`recognition_`
+
+2. **事件数据规范**：
+   - 事件数据使用字典格式
+   - 必须包含必要的标识信息，如ID、类型等
+   - 应包含操作结果，如成功/失败标志
+   - 错误事件必须包含错误信息
+
+3. **事件处理器规范**：
+   - 处理器方法名称格式为`_on_事件名称`
+   - 处理器应该是幂等的，多次处理同一事件不应产生副作用
+   - 处理器应该捕获并处理所有异常，不向上层传播
+
+## 代码审查检查项
+
+1. 检查是否有重复发送信号的情况
+2. 确保事件处理器不直接发送UI信号
+3. 验证异步任务的回调函数是否正确处理信号发送
+4. 检查事件命名是否符合规范
+5. 确保事件数据包含必要信息
+
+## 参考实现
+
+### 正确的事件处理器实现
+
+```python
+def _on_import_task_completed(self, data: Dict[str, Any]) -> None:
+    """处理导入任务完成事件"""
+    ui_logger.debug(f"导入任务完成: {data}")
+    # 不发送UI信号，只记录日志
+```
+
+### 正确的任务回调实现
+
+```python
+def _handle_import_result(self, future, window) -> None:
+    """处理导入任务的执行结果"""
+    try:
+        success, message, signal = future.result()
+        # 发送UI信号
+        self.import_finished.emit(success)
+        if not success:
+            self.import_error.emit(message)
+    except Exception as e:
+        # 处理异常
+        self.import_error.emit(str(e))
+        self.import_finished.emit(False)
+```
+
+## 相关文件
+
+- [event_bus.py](mdc:RadarIdentifySystem/radar_system/infrastructure/async_core/event_bus/event_bus.py) - 事件总线实现
+- [ui_handlers.py](mdc:RadarIdentifySystem/radar_system/interface/handlers/ui_handlers.py) - UI事件处理器
+- [signal_tasks.py](mdc:RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py) - 信号处理任务
+

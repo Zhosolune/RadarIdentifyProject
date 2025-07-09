@@ -7,7 +7,7 @@ from typing import Optional
 from datetime import datetime
 import time
 
-from radar_system.infrastructure.async_core.thread_pool.task_queue import TaskQueue, Task
+from radar_system.infrastructure.async_core.task_queue import TaskQueue, Task
 from radar_system.infrastructure.common.logging import system_logger
 
 class Worker(Thread):
@@ -77,18 +77,15 @@ class Worker(Thread):
         设置停止事件，通知线程退出。
         """
         self._stop_event.set()
-    
-    def _get_task(self) -> Optional[Task]:
-        """获取任务
         
-        从任务队列获取任务，带有超时机制。
+    def _get_task(self) -> Optional[Task]:
+        """从任务队列获取任务
         
         Returns:
-            Optional[Task]: 获取到的任务，如果队列为空则返回None
+            Optional[Task]: 获取的任务，如果队列为空则返回None
         """
         try:
-            # 使用较短的超时时间，以便及时响应停止信号
-            return self._task_queue.get(timeout=1.0)
+            return self._task_queue.get(block=True, timeout=1.0)
         except Exception:
             return None
     
@@ -96,26 +93,23 @@ class Worker(Thread):
         """检查是否空闲超时
         
         Returns:
-            bool: 是否已超时
+            bool: 是否空闲超时
         """
-        if self._idle_timeout <= 0:
-            return False
-            
         idle_time = (datetime.now() - self._last_active).total_seconds()
-        return idle_time >= self._idle_timeout
+        return idle_time > self._idle_timeout
     
     @property
-    def is_idle(self) -> bool:
-        """检查线程是否空闲
+    def is_active(self) -> bool:
+        """检查线程是否活跃
         
         Returns:
-            bool: 线程是否空闲
+            bool: 线程是否活跃
         """
-        return self._task_queue.empty()
+        return self.is_alive() and not self._stop_event.is_set()
     
     @property
     def idle_time(self) -> float:
-        """获取线程空闲时间
+        """获取空闲时间
         
         Returns:
             float: 空闲时间（秒）

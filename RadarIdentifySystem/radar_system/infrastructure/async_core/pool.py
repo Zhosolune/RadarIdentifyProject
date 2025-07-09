@@ -7,8 +7,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import asyncio
 import threading
 
-from radar_system.infrastructure.async_core.thread_pool.worker import Worker
-from radar_system.infrastructure.async_core.thread_pool.task_queue import TaskQueue, Task
+from radar_system.infrastructure.async_core.worker import Worker
+from radar_system.infrastructure.async_core.task_queue import TaskQueue, Task
 from radar_system.infrastructure.common.logging import system_logger
 from radar_system.infrastructure.common.exceptions import ProcessingError
 
@@ -83,3 +83,20 @@ class ThreadPool:
             self._shutdown = True
             self._executor.shutdown(wait=wait)
             system_logger.info("线程池已关闭")
+            
+    @property
+    def is_shutdown(self) -> bool:
+        """检查线程池是否已关闭
+        
+        Returns:
+            bool: 线程池是否已关闭
+        """
+        return self._shutdown
+        
+    def __enter__(self):
+        """上下文管理器入口"""
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """上下文管理器出口"""
+        self.shutdown(wait=True)
