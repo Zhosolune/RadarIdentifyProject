@@ -176,11 +176,14 @@ class SignalPlotter:
                 'PA': slice_data[:, 3],
                 'DTOA': dtoa
             }
+
+            slice_start_time = toa[0]
+            slice_end_time = max(toa[-1], slice_start_time + self.config_manager.data_processing.slice_length)
             
             for dim_name, data in dimensions.items():
                 image_data[dim_name] = self._plot_dimension(
                     toa, data, toa,
-                    dim_name, toa[0], toa[-1]
+                    dim_name, slice_start_time, slice_end_time
                 )
             
             return image_data
