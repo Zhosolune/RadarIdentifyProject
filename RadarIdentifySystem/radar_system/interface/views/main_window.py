@@ -337,7 +337,6 @@ class MainWindow(QMainWindow):
             # 导入处理器信号 - 使用统一的信号命名
             self.signal_import_handler.import_started.connect(self._on_import_started)
             self.signal_import_handler.import_completed.connect(self._on_import_completed)
-            self.signal_import_handler.import_failed.connect(self._on_import_error)
             self.signal_import_handler.file_selected.connect(self._on_file_selected)
             
             # 切片按钮信号
@@ -439,17 +438,18 @@ class MainWindow(QMainWindow):
         self._clear_all_displays()
         self._start_loading_animation()
         
-    def _on_import_completed(self, success: bool) -> None:
+    def _on_import_completed(self, success: bool, message: str = "") -> None:
         """导入完成的槽函数
-        
+
         处理导入完成后的所有UI更新操作，包括：
         1. 停止加载动画
         2. 更新按钮状态
         3. 更新波段和切片信息显示
         4. 显示结果对话框
-        
+
         Args:
             success: 是否成功
+            message: 结果消息（成功或错误信息）
         """
         try:
             # 确保在主线程中执行UI操作
@@ -474,16 +474,16 @@ class MainWindow(QMainWindow):
                     else:
                         # 导入失败，禁用所有按钮
                         self._update_buttons_state(False)
-                        
+
                         # 更新切片数量显示为未知状态
                         if hasattr(self, 'slice_info_label1') and hasattr(self, 'slice_info_label2'):
                             self.slice_info_label1.setText("数据包位于?波段，")
                             self.slice_info_label2.setText("预计将获得?个250ms切片")
-                            
-                        ui_logger.debug("数据导入失败，已禁用所有按钮")
-                    
+
+                        ui_logger.error(f"数据导入失败: {message}")
+
                     # 使用延迟显示对话框，确保动画已经完全停止
-                    QTimer.singleShot(100, lambda: self._show_import_result(success))
+                    QTimer.singleShot(100, lambda: self._show_import_result(success, message))
                     
                 except Exception as e:
                     ui_logger.error(f"更新UI失败: {str(e)}")
@@ -496,20 +496,7 @@ class MainWindow(QMainWindow):
                 
         except Exception as e:
             ui_logger.error(f"导入完成处理失败: {str(e)}")
-        
-    def _on_import_error(self, error_msg: str) -> None:
-        """导入错误的槽函数
-        
-        Args:
-            error_msg: 错误信息
-        """
-        try:
-            ui_logger.error(f"导入错误: {error_msg}")
-            self._stop_loading_animation()
-            QTimer.singleShot(100, lambda: self._show_import_result(False))
-        except Exception as e:
-            ui_logger.error(f"导入错误处理失败: {str(e)}")
-            
+
     def _clear_all_displays(self) -> None:
         """清空所有显示内容"""
         try:
@@ -540,13 +527,18 @@ class MainWindow(QMainWindow):
         except Exception as e:
             ui_logger.error(f"清空显示内容时出错: {str(e)}")
             
-    def _show_import_result(self, success: bool) -> None:
-        """显示导入结果对话框"""
+    def _show_import_result(self, success: bool, message: str = "") -> None:
+        """显示导入结果对话框
+
+        Args:
+            success: 是否成功
+            message: 结果消息
+        """
         try:
             if success:
-                QMessageBox.information(self, "成功", "数据导入成功")
+                QMessageBox.information(self, "成功", message or "数据导入成功")
             else:
-                QMessageBox.warning(self, "失败", "数据导入失败")
+                QMessageBox.warning(self, "失败", message or "数据导入失败")
         except Exception as e:
             ui_logger.error(f"显示导入结果对话框失败: {str(e)}")
 

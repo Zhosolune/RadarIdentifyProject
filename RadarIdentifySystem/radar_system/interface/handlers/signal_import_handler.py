@@ -16,23 +16,21 @@ from radar_system.infrastructure.common.thread_safe_signal_emitter import Thread
 
 class SignalImportHandler(ThreadSafeSignalEmitter):
     """信号导入事件处理器
-    
+
     处理与信号数据导入相关的所有UI事件。
-    
+
     Signals:
         import_started: 导入开始信号
-        import_completed: 导入完成信号，携带成功标志
-        import_failed: 导入失败信号，携带错误信息
+        import_completed: 导入完成信号，携带成功标志和消息
         file_selected: 文件选择完成信号，携带文件路径
-        
+
     Attributes:
         event_bus (EventBus): 事件总线实例
     """
     
     # 定义Qt信号 - 统一命名格式：{功能}_{动作}_{状态}
     import_started = pyqtSignal()
-    import_completed = pyqtSignal(bool)  # 参数为是否成功
-    import_failed = pyqtSignal(str)  # 参数为错误信息
+    import_completed = pyqtSignal(bool, str)  # 参数为是否成功和消息
     file_selected = pyqtSignal(str)  # 参数为文件路径
     
     def __init__(self):
@@ -124,7 +122,7 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
             error_msg = f"导入处理出错: {str(e)}"
             ui_logger.error(error_msg)
             QMessageBox.critical(window, "错误", error_msg)
-            self.import_error.emit(error_msg)
+            self.safe_emit_signal(self.import_completed, False, error_msg)
     
     def _handle_import_result(self, future, window) -> None:
         """处理导入任务的执行结果
@@ -139,18 +137,16 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
             if success and signal:
                 ui_logger.info(f"导入任务完成: {signal.id}")
                 # 发射导入成功信号
-                self.safe_emit_signal(self.import_completed, True)
+                self.safe_emit_signal(self.import_completed, True, "导入成功")
             else:
                 ui_logger.error(f"导入任务失败: {message}")
                 # 发射导入失败信号
-                self.safe_emit_signal(self.import_failed, message)
-                self.safe_emit_signal(self.import_completed, False)
+                self.safe_emit_signal(self.import_completed, False, message)
 
         except Exception as e:
             error_msg = f"处理导入结果时出错: {str(e)}"
             ui_logger.error(error_msg)
-            self.safe_emit_signal(self.import_failed, error_msg)
-            self.safe_emit_signal(self.import_completed, False)
+            self.safe_emit_signal(self.import_completed, False, error_msg)
 
     def cleanup(self) -> None:
         """清理资源"""
