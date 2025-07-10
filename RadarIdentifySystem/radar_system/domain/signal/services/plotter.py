@@ -9,6 +9,7 @@ from typing import Dict, Optional
 
 from radar_system.infrastructure.common.config import ConfigManager
 from radar_system.infrastructure.common.logging import plotter_logger
+from radar_system.domain.signal.entities.signal import SignalSlice
 
 @dataclass
 class PlotConfig:
@@ -151,43 +152,56 @@ class SignalPlotter:
             plotter_logger.error(f"生成{dim_name}维度图像失败: {str(e)}")
             raise
     
-    def plot_slice(self, slice_data: np.ndarray) -> Dict[str, np.ndarray]:
+    def plot_slice(self, slice_data: SignalSlice) -> Dict[str, np.ndarray]:
         """生成切片的所有维度图像
-        
+
         Args:
-            slice_data (np.ndarray): 切片数据，形状为(n_samples, n_features)
-            
+            slice_data (SignalSlice): 信号切片对象，包含数据和时间范围信息
+
         Returns:
             Dict[str, np.ndarray]: 图像数据字典，键为维度名称，值为二值化图像数组
         """
         try:
-            toa = slice_data[:, 4]  # TOA数据
-            
+            # 检查切片是否为空
+            if slice_data.is_empty:
+                plotter_logger.warning("切片数据为空，无法生成图像")
+                return {}
+
+            # 获取切片数据
+            data = slice_data.data
+            toa = data[:, 4]  # TOA数据
+
             # 计算DTOA
             dtoa = np.diff(toa) * 1000  # 转换为us
             dtoa = np.append(dtoa, 0)   # 补齐长度
-            
+
             # 生成所有维度的图像
             image_data = {}
             dimensions = {
-                'CF': slice_data[:, 0],
-                'PW': slice_data[:, 1],
-                'DOA': slice_data[:, 2],
-                'PA': slice_data[:, 3],
+                'CF': data[:, 0],
+                'PW': data[:, 1],
+                'DOA': data[:, 2],
+                'PA': data[:, 3],
                 'DTOA': dtoa
             }
 
-            slice_start_time = toa[0]
-            slice_end_time = max(toa[-1], slice_start_time + self.config_manager.data_processing.slice_length)
-            
-            for dim_name, data in dimensions.items():
+            # 使用SignalSlice的time_range属性来设置正确的时间轴边界
+            slice_start_time = slice_data.time_range.start_time
+            slice_end_time = slice_data.time_range.end_time
+
+            plotter_logger.debug(
+                f"绘制切片 {slice_data.id}: 时间范围 [{slice_start_time:.1f}, {slice_end_time:.1f}]ms, "
+                f"数据点数: {slice_data.point_count}"
+            )
+
+            for dim_name, dim_data in dimensions.items():
                 image_data[dim_name] = self._plot_dimension(
-                    toa, data, toa,
+                    toa, dim_data, toa,
                     dim_name, slice_start_time, slice_end_time
                 )
-            
+
             return image_data
-            
+
         except Exception as e:
             plotter_logger.error(f"生成切片图像失败: {str(e)}")
-            raise 
+            raise

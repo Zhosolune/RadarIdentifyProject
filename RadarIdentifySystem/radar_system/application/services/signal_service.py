@@ -261,7 +261,7 @@ class SignalService:
             self.plotter.update_band_config(signal.band_type)
 
             # 生成图像数据
-            image_data = self.plotter.plot_slice(slice_data.data)
+            image_data = self.plotter.plot_slice(slice_data)
 
             # 保存图像文件
             image_paths = self.file_storage.save_slice_images(
