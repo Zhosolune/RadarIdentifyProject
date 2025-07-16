@@ -5,9 +5,11 @@
 
 from .clustering_service import DBSCANClusteringService, ClusteringParams
 from .ui_params_parser import UIParamsParser
+from .pipeline_runner import PipelineRunner
 
 __all__ = [
     'DBSCANClusteringService',
     'ClusteringParams',
-    'UIParamsParser'
+    'UIParamsParser',
+    'PipelineRunner'
 ]
