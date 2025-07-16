@@ -21,6 +21,28 @@ recognition_pipelines:
           epsilon_PW: 0.2
           min_pts: 3
 
+  # 聚类结果处理流程 - 单个聚类的完整处理链
+  cluster_processing:
+    name: "聚类结果处理流程"
+    description: "对单个聚类结果执行图像生成、识别、特征提取的完整流程"
+    pipeline:
+      - name: plotting
+        processor: cluster_plotting
+        input_from: [input]
+        params:
+          band_name: "C波段"  # 默认使用C波段配置
+
+      # 后续步骤待实现：图像识别、特征提取、结果保存
+      # - name: recognition
+      #   processor: image_recognition
+      #   input_from: [plotting]
+      #   params: {}
+
+      # - name: extraction
+      #   processor: feature_extraction
+      #   input_from: [recognition]
+      #   params: {}
+
 # 默认管道配置
 default_pipeline: "default"
 
