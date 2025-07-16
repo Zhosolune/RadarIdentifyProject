@@ -5,9 +5,12 @@
 
 from .base_processor import BaseProcessor
 from .registry import PROCESSOR_REGISTRY, register_processor
+from .clustering import CFClusteringProcessor, PWClusteringProcessor
 
 __all__ = [
     'BaseProcessor',
-    'PROCESSOR_REGISTRY', 
-    'register_processor'
+    'PROCESSOR_REGISTRY',
+    'register_processor',
+    'CFClusteringProcessor',
+    'PWClusteringProcessor'
 ]

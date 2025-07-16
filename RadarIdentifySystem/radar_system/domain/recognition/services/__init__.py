@@ -6,10 +6,12 @@
 from .clustering_service import DBSCANClusteringService, ClusteringParams
 from .ui_params_parser import UIParamsParser
 from .pipeline_runner import PipelineRunner
+from .unclustered_data_clustering_service import UnclusteredDataClusteringService
 
 __all__ = [
     'DBSCANClusteringService',
     'ClusteringParams',
     'UIParamsParser',
-    'PipelineRunner'
+    'PipelineRunner',
+    'UnclusteredDataClusteringService'
 ]

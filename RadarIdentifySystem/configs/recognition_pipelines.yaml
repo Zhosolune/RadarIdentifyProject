@@ -1,0 +1,90 @@
+# 识别管道配置文件
+# 定义了不同模式的识别流程配置
+
+recognition_pipelines:
+  # 默认识别流程 - 标准的CF-PW两阶段聚类
+  default:
+    name: "默认识别流程"
+    description: "标准的CF-PW两阶段聚类识别流程"
+    pipeline:
+      - name: cf_clustering
+        processor: cf_clustering
+        input_from: [input]
+        params:
+          epsilon_CF: 2.0
+          min_pts: 3
+          
+      - name: pw_clustering
+        processor: pw_clustering
+        input_from: [cf_clustering]
+        params:
+          epsilon_PW: 0.2
+          min_pts: 3
+
+  # 快速识别模式 - 仅CF聚类
+  fast_mode:
+    name: "快速识别模式"
+    description: "仅执行CF聚类的快速识别流程"
+    pipeline:
+      - name: cf_clustering
+        processor: cf_clustering
+        input_from: [input]
+        params:
+          epsilon_CF: 3.0
+          min_pts: 2
+
+  # 精细识别模式 - 更严格的参数
+  precise_mode:
+    name: "精细识别模式"
+    description: "使用更严格参数的精细识别流程"
+    pipeline:
+      - name: cf_clustering
+        processor: cf_clustering
+        input_from: [input]
+        params:
+          epsilon_CF: 1.5
+          min_pts: 5
+          
+      - name: pw_clustering
+        processor: pw_clustering
+        input_from: [cf_clustering]
+        params:
+          epsilon_PW: 0.1
+          min_pts: 5
+
+  # 研究模式 - 用于算法研究和调试
+  research_mode:
+    name: "研究模式"
+    description: "用于算法研究和调试的详细流程"
+    pipeline:
+      - name: cf_clustering
+        processor: cf_clustering
+        input_from: [input]
+        params:
+          epsilon_CF: 2.5
+          min_pts: 4
+          
+      - name: pw_clustering
+        processor: pw_clustering
+        input_from: [cf_clustering]
+        params:
+          epsilon_PW: 0.15
+          min_pts: 4
+
+# 默认管道配置
+default_pipeline: "default"
+
+# 管道参数范围约束
+parameter_constraints:
+  epsilon_CF:
+    min: 0.1
+    max: 10.0
+    default: 2.0
+  epsilon_PW:
+    min: 0.01
+    max: 2.0
+    default: 0.2
+  min_pts:
+    min: 1
+    max: 20
+    default: 3
