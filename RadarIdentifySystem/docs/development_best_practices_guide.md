@@ -818,10 +818,12 @@ class RecognitionHandler(QObject):
                 event_bus=self.event_bus
             )
 
-            # 提交任务到线程池
-            future = window.thread_pool.submit(recognition_task.execute)
-            future.add_done_callback(
-                lambda f: self._handle_recognition_result(f, window)
+            # 使用AsyncExecutor替代线程池
+            AsyncExecutor.execute_async(
+                window.recognition_service.start_recognition_processing,
+                self,
+                "_handle_recognition_result_async",
+                signal_data
             )
 
             ui_logger.info(f"信号识别任务已启动: {signal_data.id}")

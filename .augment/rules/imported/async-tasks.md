@@ -31,25 +31,30 @@ class SignalSliceTask:
         return self.service.start_slice_processing(self.signal)
 ```
 
-## 线程池使用规范
-参考 [pool.py](mdc:RadarIdentifySystem/radar_system/infrastructure/async_core/pool.py):
+## AsyncExecutor使用规范
+参考 [async_executor.py](mdc:RadarIdentifySystem/radar_system/infrastructure/common/async_executor.py):
 
-✅ **正确示例** - 简单的线程池管理:
+✅ **正确示例** - 使用AsyncExecutor简化异步执行:
 ```python
-class MainWindow(QMainWindow):
-    def __init__(self):
-        self.thread_pool = ThreadPoolExecutor(max_workers=4)
-        
-    def submit_task(self, task):
-        future = self.thread_pool.submit(task.execute)
-        future.add_done_callback(self._handle_task_result)
-        return future
+class SignalImportHandler(ThreadSafeSignalEmitter):
+    def import_data(self, window, file_path: str):
+        AsyncExecutor.execute_async(
+            window.signal_service.load_signal_file,
+            self,
+            "_handle_import_result_async",
+            file_path
+        )
+
+    @pyqtSlot(object)
+    def _handle_import_result_async(self, result):
+        success, message, signal = result
+        self.safe_emit_signal(self.import_completed, success, message)
 ```
 
 ❌ **错误示例** - 过度复杂的线程池封装:
 ```python
 class ComplexThreadPoolManager:
-    # 避免不必要的包装层
+    # 避免不必要的包装层，使用AsyncExecutor替代
     pass
 ```
 
@@ -93,8 +98,8 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
 
 ## 异步处理生命周期管理
 - **接收事件**: Handler接收UI事件
-- **提交Service**: 直接将Service方法提交到线程池
-- **监听结果**: 通过回调函数处理Service执行结果
+- **异步执行**: 使用AsyncExecutor创建线程执行Service方法
+- **监听结果**: 通过线程安全回调处理Service执行结果
 - **信号发射**: 使用线程安全方式发射信号到UI
 
 ## 操作类型规范

@@ -49,7 +49,8 @@
     2. 应用层 (Application Layer)
     RadarIdentifySystem/radar_system/application/services/signal_service.py    # 信号处理应用服务
     RadarIdentifySystem/radar_system/application/services/recognition_service.py # 识别处理应用服务
-    # 任务相关文件已删除，采用Handler直接调用Service的简化架构
+    # 异步执行相关文件
+    RadarIdentifySystem/radar_system/infrastructure/common/async_executor.py # AsyncExecutor异步执行器
     RadarIdentifySystem/radar_system/application/events/signal_events.py      # 信号处理事件
     RadarIdentifySystem/radar_system/application/events/recognition_events.py # 识别处理事件
 
@@ -104,7 +105,8 @@
         - signal_service.py: 协调信号处理流程，包括数据加载、预处理等
         - recognition_service.py: 协调识别流程，包括特征提取、模型预测等
 
-        # tasks包已删除，采用Handler直接调用Service的简化架构
+        # 异步执行架构
+        - async_executor.py: AsyncExecutor异步执行器，替代复杂的线程池实现
 
         c) events包
         - signal_events.py: 定义信号处理相关事件

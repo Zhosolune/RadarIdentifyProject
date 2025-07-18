@@ -109,12 +109,12 @@ class TaskType:
 ```
 
 ## 异步操作最佳实践
-1. 使用dataclass定义任务数据结构
-2. 任务执行方法必须返回统一格式
-3. 所有耗时操作必须在后台线程执行
-4. UI更新必须通过线程安全信号发射
-5. 任务失败时记录详细日志
-6. 避免复杂的任务依赖关系
+1. 使用AsyncExecutor替代复杂的线程池实现
+2. Service方法必须返回统一格式 (success, message, data)
+3. 所有耗时操作必须使用AsyncExecutor异步执行
+4. UI更新必须通过线程安全的@pyqtSlot回调
+5. 异步执行失败时记录详细日志
+6. 保持Handler和Service的职责分离
 
 ## Worker类设计
 参考 [worker.py](mdc:RadarIdentifySystem/radar_system/infrastructure/async_core/worker.py):

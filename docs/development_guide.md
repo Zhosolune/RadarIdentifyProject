@@ -947,37 +947,35 @@ def test_event_publishing():
 
 #### 5.1.1 异步任务类型
 1. **计算密集型任务**
-   - 信号处理和分析
-   - 特征提取
+   - 信号处理和分析（切片处理）
+   - 特征提取和识别
    - 数据批处理
-   
+
 2. **IO密集型任务**
-   - 文件读写操作
-   - 网络请求处理
-   - 数据库访问
-   
-3. **定时任务**
-   - 系统状态监控
-   - 数据定期备份
-   - 资源清理维护
-   
-4. **事件驱动任务**
-   - UI交互响应
-   - 系统状态更新
-   - 外部信号处理
+   - Excel文件读写操作
+   - 配置文件加载
+   - 结果数据保存
+
+3. **UI响应任务**
+   - 避免阻塞用户界面
+   - 保持应用程序响应性
+   - 提供异步反馈机制
 
 ### 5.2 异步处理机制
 
-#### 5.2.1 线程池
-- 适用于计算密集型任务
-- 详细实现参见[线程池开发指南](#6-线程池开发指南)
+#### 5.2.1 AsyncExecutor异步执行器
+- 适用于低频异步任务
+- 简化的线程管理，符合YAGNI原则
+- 详细实现参见[AsyncExecutor使用指南](#6-asyncexecutor使用指南)
 ```python
-# 使用线程池处理计算密集型任务
-def process_signal_batch(signals):
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = [executor.submit(process_signal, signal) 
-                  for signal in signals]
-        return futures
+# 使用AsyncExecutor处理异步任务
+def import_signal_data(self, file_path):
+    AsyncExecutor.execute_async(
+        self.signal_service.load_signal_file,
+        self,
+        "_handle_import_result_async",
+        file_path
+    )
 ```
 
 #### 5.2.2 协程
@@ -1137,56 +1135,69 @@ async def test_async_task():
     assert result is not None
 ```
 
-## 6. 线程池开发指南
+## 6. AsyncExecutor使用指南
 
 ### 6.1 概述
 
-线程池是本项目中用于优化并发处理和资源管理的核心机制，通过统一的任务调度和线程管理，实现了系统性能的提升和资源的高效利用。
+AsyncExecutor是本项目中用于简化异步处理的核心机制，使用普通线程按需创建，替代了复杂的线程池实现。它专为单用户桌面应用的低频异步任务设计，符合YAGNI原则。
 
 #### 6.1.1 基本概念
-- **线程池（Thread Pool）**：管理一组工作线程的资源池
-- **工作线程（Worker Thread）**：执行具体任务的线程实例
-- **任务队列（Task Queue）**：存储待执行任务的队列
-- **任务调度器（Task Scheduler）**：负责任务分配和调度的组件
+- **AsyncExecutor**：简化的异步执行器，按需创建线程
+- **异步任务**：需要在后台执行的耗时操作
+- **回调机制**：线程安全的结果处理方式
+- **守护线程**：随主程序退出自动清理的线程
 
 #### 6.1.2 代码位置
 ```
 radar_system/
 └── infrastructure/
-    └── async/
-        └── thread_pool/
-            ├── pool.py        # 线程池核心实现
-            ├── worker.py      # 工作线程实现
-            └── task_queue.py  # 任务队列管理
+    └── common/
+        └── async_executor.py  # AsyncExecutor核心实现
 ```
 
 ### 6.2 核心功能
 
 #### 6.2.1 基础实现
-线程池的实现采用核心层与集成层分离的设计模式，以保证代码的清晰性和可维护性。
+AsyncExecutor采用简化的设计模式，专注于异步执行的核心功能，避免过度设计。
 
-##### 6.2.1.1 核心层实现
+##### 6.2.1.1 核心实现
 ```python
-class ThreadPool:
-    """线程池核心实现
-    
-    保持核心功能的纯粹性，专注于线程管理和任务调度
+class AsyncExecutor:
+    """简化的异步执行器
+
+    使用普通线程按需创建，适合低频异步任务
     """
-    def submit(self, task_func, *args, **kwargs) -> Future:
-        """提交任务到线程池
-        
+    @staticmethod
+    def execute_async(
+        func: Callable,
+        callback_obj: QObject,
+        callback_method: str,
+        *args,
+        **kwargs
+    ) -> threading.Thread:
+        """异步执行函数并回调结果
+
         Args:
-            task_func: 任务函数
-            *args: 位置参数
-            **kwargs: 关键字参数
-            
+            func: 要异步执行的函数
+            callback_obj: 回调对象（通常是Handler实例）
+            callback_method: 回调方法名（字符串）
+            *args: 传递给func的位置参数
+            **kwargs: 传递给func的关键字参数
+
         Returns:
-            Future: 用于获取任务执行结果的Future对象
+            threading.Thread: 执行任务的线程对象
         """
-        task = Task(task_func, args, kwargs)
-        future = Future()
-        self.task_queue.put((task, future))
-        return future
+        def task():
+            try:
+                result = func(*args, **kwargs)
+                AsyncExecutor._safe_callback(callback_obj, callback_method, result)
+            except Exception as e:
+                error_result = (False, str(e), None)
+                AsyncExecutor._safe_callback(callback_obj, callback_method, error_result)
+
+        thread = threading.Thread(target=task, daemon=True)
+        thread.start()
+        return thread
 ```
 
 ##### 6.2.1.2 集成层实现

@@ -134,15 +134,14 @@ class ConfigManager:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-# ✅ 线程池管理 - 资源共享
-class ThreadPoolManager:
-    _instance = None
+# ✅ 异步执行器 - 简化的异步处理
+class AsyncExecutor:
+    """简化的异步执行器，替代复杂的线程池实现"""
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.thread_pool = ThreadPoolExecutor(max_workers=4)
-        return cls._instance
+    @staticmethod
+    def execute_async(func, callback_obj, callback_method, *args, **kwargs):
+        # 使用普通线程按需创建，符合YAGNI原则
+        pass
 ```
 
 #### 不适合使用单例的组件
@@ -300,13 +299,14 @@ class SignalSliceHandler:
         future = window.thread_pool.submit(slice_task.execute)
 
 class SignalSliceHandler:
-    def start_slice(self, signal, thread_pool):
-        # Handler层 → Service层（直接异步调用）
-        future = thread_pool.submit(
+    def start_slice(self, signal, message_callback=None):
+        # Handler层 → Service层（使用AsyncExecutor简化异步调用）
+        AsyncExecutor.execute_async(
             self.signal_service.start_slice_processing,
+            self,
+            "_handle_slice_result_async",
             signal
         )
-        future.add_done_callback(self._handle_slice_result)
 
 class SignalService:
     def start_slice_processing(self, signal: SignalData):
@@ -664,40 +664,45 @@ class SignalProcessingTask(BaseTask):
 
 ### 7.2 线程池使用和资源管理
 
-#### 线程池管理器
+#### AsyncExecutor异步执行器
 ```python
-class ThreadPoolManager:
-    """线程池管理器"""
+class AsyncExecutor:
+    """简化的异步执行器，替代复杂的线程池实现"""
 
-    _instance = None
+    @staticmethod
+    def execute_async(
+        func: Callable,
+        callback_obj: QObject,
+        callback_method: str,
+        *args,
+        **kwargs
+    ) -> threading.Thread:
+        """异步执行函数并回调结果
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
+        使用普通线程按需创建，适合低频异步任务。
+        符合YAGNI原则，只实现实际需要的功能。
 
-    def __init__(self):
-        if not self._initialized:
-            self.thread_pool = ThreadPoolExecutor(
-                max_workers=4,
-                thread_name_prefix="RadarSystem"
-            )
-            self._active_futures = set()
-            self._initialized = True
+        Args:
+            func: 要异步执行的函数
+            callback_obj: 回调对象（通常是Handler实例）
+            callback_method: 回调方法名（字符串）
+            *args: 传递给func的位置参数
+            **kwargs: 传递给func的关键字参数
 
-    def submit_task(self, task: BaseTask) -> Future:
-        """提交任务到线程池"""
-        future = self.thread_pool.submit(task.execute)
-        self._active_futures.add(future)
+        Returns:
+            threading.Thread: 执行任务的线程对象
+        """
+        def task():
+            try:
+                result = func(*args, **kwargs)
+                AsyncExecutor._safe_callback(callback_obj, callback_method, result)
+            except Exception as e:
+                error_result = (False, str(e), None)
+                AsyncExecutor._safe_callback(callback_obj, callback_method, error_result)
 
-        # 添加完成回调来清理Future引用
-        future.add_done_callback(self._cleanup_future)
-        return future
-
-    def _cleanup_future(self, future: Future):
-        """清理完成的Future"""
-        self._active_futures.discard(future)
+        thread = threading.Thread(target=task, daemon=True)
+        thread.start()
+        return thread
 
     def shutdown(self, wait: bool = True):
         """关闭线程池"""
@@ -742,13 +747,14 @@ class SignalSliceHandler(ThreadSafeSignalEmitter):
         super().__init__()
         self.signal_service = signal_service
 
-    def start_slice(self, signal: SignalData, thread_pool):
-        # 直接提交Service方法到线程池，消除Task抽象层
-        future = thread_pool.submit(
+    def start_slice(self, signal: SignalData, message_callback=None):
+        # 使用AsyncExecutor替代线程池，简化异步执行
+        AsyncExecutor.execute_async(
             self.signal_service.start_slice_processing,
+            self,
+            "_handle_slice_result_async",
             signal
         )
-        future.add_done_callback(self._handle_slice_result)
 ```
 
 ## 8. 实施指导和代码示例

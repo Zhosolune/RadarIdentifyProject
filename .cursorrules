@@ -308,21 +308,26 @@ class BaseTask(ABC):
     pass
 ```
 
-### 7.2 线程池使用规范
+### 7.2 AsyncExecutor使用规范
 ```python
-# ✅ 正确示例 - 简单的线程池管理
-class MainWindow(QMainWindow):
-    def __init__(self):
-        self.thread_pool = ThreadPoolExecutor(max_workers=4)
-        
-    def submit_task(self, task):
-        future = self.thread_pool.submit(task.execute)
-        future.add_done_callback(self._handle_task_result)
-        return future
+# ✅ 正确示例 - 使用AsyncExecutor简化异步执行
+class SignalImportHandler(ThreadSafeSignalEmitter):
+    def import_data(self, window, file_path: str):
+        AsyncExecutor.execute_async(
+            window.signal_service.load_signal_file,
+            self,
+            "_handle_import_result_async",
+            file_path
+        )
+
+    @pyqtSlot(object)
+    def _handle_import_result_async(self, result):
+        success, message, signal = result
+        self.safe_emit_signal(self.import_completed, success, message)
 
 # ❌ 错误示例 - 过度复杂的线程池封装
 class ComplexThreadPoolManager:
-    # 避免不必要的包装层
+    # 避免不必要的包装层，使用AsyncExecutor替代
     pass
 ```
 
