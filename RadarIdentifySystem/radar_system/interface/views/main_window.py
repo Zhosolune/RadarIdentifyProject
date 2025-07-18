@@ -22,7 +22,7 @@ from radar_system.infrastructure.common.exceptions import UIError
 from radar_system.domain.signal.services.validator import SignalValidator
 from radar_system.infrastructure.persistence.excel.reader import ExcelReader
 from radar_system.application.services.signal_service import SignalService
-from radar_system.infrastructure.async_core.pool import ThreadPool
+# ThreadPool已移除，使用AsyncExecutor替代
 from radar_system.infrastructure.common.config import ConfigManager
 from radar_system.domain.signal.entities.signal import SignalSlice
 from radar_system.domain.signal.services.processor import SignalProcessor
@@ -57,12 +57,7 @@ class MainWindow(QMainWindow):
             self.dimensions = StyleSheets.get_dimensions()
             
 
-            # 初始化线程池
-            self.thread_pool = ThreadPool(
-                max_workers=4,  # 可以根据需要调整
-                min_workers=2,
-                idle_timeout=60  # 空闲线程的超时时间（秒）
-            )
+            # 线程池已移除，使用AsyncExecutor替代，无需初始化
             
             # 初始化Infrastructure层组件
             self.signal_validator = SignalValidator()
@@ -315,9 +310,8 @@ class MainWindow(QMainWindow):
         """清理资源"""
         try:
             ui_logger.info("正在清理资源...")
-            # 关闭线程池
-            if hasattr(self, 'thread_pool'):
-                self.thread_pool.shutdown()
+            # 线程池已移除，使用AsyncExecutor的守护线程会自动清理
+            # 无需手动关闭线程池
         except Exception as e:
             ui_logger.error(f"资源清理失败: {str(e)}")
     
@@ -625,9 +619,9 @@ class MainWindow(QMainWindow):
                 return
 
             # 调用切片处理器，符合DDD分层架构：不传递UI层实例
+            # 使用AsyncExecutor，无需传递thread_pool参数
             self.slice_handler.start_slice(
                 signal=signal,
-                thread_pool=self.thread_pool,
                 message_callback=self._show_message_box
             )
             

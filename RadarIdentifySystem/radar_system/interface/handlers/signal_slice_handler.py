@@ -4,11 +4,12 @@
 """
 
 from typing import Optional, Tuple
-from PyQt5.QtCore import pyqtSignal, QThread
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, QThread
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
 from radar_system.infrastructure.common.logging import ui_logger
 from radar_system.infrastructure.common.thread_safe_signal_emitter import ThreadSafeSignalEmitter
+from radar_system.infrastructure.common.async_executor import AsyncExecutor
 
 from radar_system.application.services.signal_service import SignalService
 from radar_system.domain.signal.entities.signal import SignalData, SignalSlice
@@ -49,16 +50,15 @@ class SignalSliceHandler(ThreadSafeSignalEmitter):
     
 
     
-    def start_slice(self, signal: SignalData, thread_pool, message_callback=None) -> None:
+    def start_slice(self, signal: SignalData, message_callback=None) -> None:
         """启动信号切片处理
 
         符合DDD分层架构：Handler层直接使用注入的SignalService，
         不再依赖UI层实例来访问Application层服务。
-        消除Task抽象层，直接调用Service方法。
+        使用AsyncExecutor替代线程池，简化异步执行。
 
         Args:
             signal: 待切片的信号数据
-            thread_pool: 线程池实例
             message_callback: 消息回调函数（可选，用于显示错误消息）
         """
         if not signal:
@@ -70,13 +70,12 @@ class SignalSliceHandler(ThreadSafeSignalEmitter):
             # 发射切片开始信号
             self.safe_emit_signal(self.slice_started)
 
-            # 直接提交Service方法到线程池，消除Task抽象层
-            future = thread_pool.submit(
+            # 使用AsyncExecutor替代线程池，简化异步执行
+            AsyncExecutor.execute_async(
                 self.signal_service.start_slice_processing,
+                self,
+                "_handle_slice_result_async",
                 signal
-            )
-            future.add_done_callback(
-                lambda f: self._handle_slice_result(f)
             )
 
             ui_logger.info(f"信号切片任务已启动: {signal.id}")
@@ -87,11 +86,38 @@ class SignalSliceHandler(ThreadSafeSignalEmitter):
             if message_callback:
                 message_callback("错误", error_msg, QMessageBox.Critical)
     
-    def _handle_slice_result(self, future) -> None:
-        """处理切片Service执行结果
+    @pyqtSlot(object)
+    def _handle_slice_result_async(self, result) -> None:
+        """处理AsyncExecutor的异步回调结果
 
-        直接处理SignalService.start_slice_processing的返回结果，
-        消除了Task抽象层，简化了调用链。
+        新的回调方法，直接接收Service执行结果，
+        使用AsyncExecutor的线程安全回调机制。
+        符合DDD分层架构：使用注入的SignalService，不依赖UI层实例。
+        """
+        try:
+            success, message, slices = result
+
+            if success and slices:
+                ui_logger.info(f"切片完成，生成{len(slices)}个切片")
+                # 发送切片完成信号
+                self.safe_emit_signal(self.slice_completed, True, len(slices))
+
+                # ✅ 架构合规：直接使用注入的SignalService
+                self.request_next_slice()
+            else:
+                ui_logger.error(f"切片失败: {message}")
+                # 发送切片失败信号
+                self.safe_emit_signal(self.slice_failed, message)
+
+        except Exception as e:
+            error_msg = f"处理切片结果时出错: {str(e)}"
+            ui_logger.error(error_msg)
+            self.safe_emit_signal(self.slice_failed, error_msg)
+
+    def _handle_slice_result(self, future) -> None:
+        """处理切片Service执行结果（保留兼容性）
+
+        保留原有的Future风格回调方法，以防其他地方还在使用。
         符合DDD分层架构：使用注入的SignalService，不依赖UI层实例。
         """
         try:

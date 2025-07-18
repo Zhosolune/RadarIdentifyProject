@@ -5,11 +5,12 @@
 
 from typing import Optional
 from pathlib import Path
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 from radar_system.infrastructure.common.logging import ui_logger
 from radar_system.infrastructure.common.thread_safe_signal_emitter import ThreadSafeSignalEmitter
+from radar_system.infrastructure.common.async_executor import AsyncExecutor
 
 
 
@@ -85,6 +86,8 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
     def import_data(self, window, file_path: str) -> None:
         """导入文件
 
+        使用AsyncExecutor替代线程池，简化异步执行。
+
         Args:
             window: 主窗口实例
             file_path: 要导入的文件路径
@@ -103,13 +106,12 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
             # 发送导入开始信号
             self.import_started.emit()
 
-            # 直接提交Service方法到线程池，消除Task抽象层
-            future = window.thread_pool.submit(
+            # 使用AsyncExecutor替代线程池，简化异步执行
+            AsyncExecutor.execute_async(
                 window.signal_service.load_signal_file,
+                self,
+                "_handle_import_result_async",
                 file_path
-            )
-            future.add_done_callback(
-                lambda f: self._handle_import_result(f, window)
             )
 
             ui_logger.info(f"信号导入任务已启动: {file_path}")
@@ -120,15 +122,41 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
             QMessageBox.critical(window, "错误", error_msg)
             self.safe_emit_signal(self.import_completed, False, error_msg)
     
-    def _handle_import_result(self, future, window) -> None:
-        """处理导入Service执行结果
+    @pyqtSlot(object)
+    def _handle_import_result_async(self, result) -> None:
+        """处理AsyncExecutor的异步回调结果
 
-        直接处理SignalService.load_signal_file的返回结果，
-        消除了Task抽象层，简化了调用链。
+        新的回调方法，直接接收Service执行结果，
+        使用AsyncExecutor的线程安全回调机制。
+
+        Args:
+            result: Service执行结果 (success, message, signal)
+        """
+        try:
+            success, message, signal = result
+
+            if success and signal:
+                ui_logger.info(f"导入完成: {signal.id}")
+                # 发射导入成功信号
+                self.safe_emit_signal(self.import_completed, True, "导入成功")
+            else:
+                ui_logger.error(f"导入失败: {message}")
+                # 发射导入失败信号
+                self.safe_emit_signal(self.import_completed, False, message)
+
+        except Exception as e:
+            error_msg = f"处理导入结果时出错: {str(e)}"
+            ui_logger.error(error_msg)
+            self.safe_emit_signal(self.import_completed, False, error_msg)
+
+    def _handle_import_result(self, future, window) -> None:
+        """处理导入Service执行结果（保留兼容性）
+
+        保留原有的Future风格回调方法，以防其他地方还在使用。
 
         Args:
             future: Future对象，包含Service执行结果
-            window: 主窗口实例
+            window: 主窗口实例（未使用，保持接口兼容）
         """
         try:
             success, message, signal = future.result()
