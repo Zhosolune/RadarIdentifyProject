@@ -4,7 +4,7 @@
 遵循DDD架构原则，在Domain层实现核心聚类业务逻辑。
 """
 
-from typing import List, Tuple, Dict, Optional, Any
+from typing import List, Tuple, Dict, Optional, Any, Union
 import numpy as np
 from sklearn.cluster import DBSCAN
 from dataclasses import dataclass
@@ -69,50 +69,73 @@ class DBSCANClusteringService:
             system_logger.error(error_msg)
             raise ValidationError(error_msg) from e
     
-    def cluster_signal_slice(self, 
-                           signal_slice: SignalSlice,
+    def cluster_signal_slice(self,
+                           signal_data: Union[SignalSlice, UnclusteredPulseData],
                            clustering_params: ClusteringParams) -> Tuple[List[ClusterResult], Optional[UnclusteredPulseData]]:
-        """对信号切片进行DBSCAN聚类
-        
+        """对信号数据进行DBSCAN聚类
+
+        支持两种输入类型：
+        1. SignalSlice: 原始信号切片
+        2. UnclusteredPulseData: 未聚类的脉冲数据
+
         Args:
-            signal_slice: 信号切片实体对象
+            signal_data: 信号数据（SignalSlice或UnclusteredPulseData）
             clustering_params: 聚类参数
-            
+
         Returns:
             tuple: (聚类结果列表, 未聚类数据实体)
                 - 聚类结果列表：成功聚类的结果
                 - 未聚类数据实体：聚类失败的数据，如果所有数据都成功聚类则为None
-                
+
         Raises:
-            ValidationError: 当输入参数无效时
+            ValidationError: 当输入参数无效或聚类失败时
         """
         try:
             # 验证输入参数
-            self._validate_inputs(signal_slice, clustering_params)
-            
-            # 检查切片是否为空
-            if signal_slice.is_empty:
-                system_logger.warning(f"切片 {signal_slice.id} 为空，无法进行聚类")
+            self._validate_inputs(signal_data, clustering_params)
+
+            # 根据输入类型提取数据
+            if isinstance(signal_data, SignalSlice):
+                system_logger.debug(f"处理SignalSlice类型输入，切片索引: {signal_data.slice_index}")
+                data = signal_data.data
+                slice_index = signal_data.slice_index
+                time_range = signal_data.time_range
+                is_empty = signal_data.is_empty
+                data_id = signal_data.id
+            else:  # UnclusteredPulseData
+                system_logger.debug(f"处理UnclusteredPulseData类型输入，切片索引: {signal_data.slice_index}")
+                data = signal_data.pulse_data
+                slice_index = signal_data.slice_index
+                time_range = signal_data.time_ranges
+                is_empty = data.size == 0
+                data_id = f"unclustered-{signal_data.slice_index}"
+
+            # 检查数据是否为空
+            if is_empty:
+                system_logger.warning(f"数据 {data_id} 为空，无法进行聚类")
                 return [], None
-            
-            # 提取聚类特征数据
-            feature_data = self._extract_clustering_features(signal_slice.data, clustering_params.dimension)
-            
+
+            # 提取聚类特征数据: CF/PW
+            feature_data = self._extract_clustering_features(data, clustering_params.dimension)
+
             # 执行DBSCAN聚类
             cluster_labels = self._perform_dbscan_clustering(feature_data, clustering_params)
-            
+
             # 处理聚类结果
             cluster_results, unclustered_data = self._process_clustering_results(
-                signal_slice, cluster_labels, clustering_params
+                data, slice_index, time_range, cluster_labels, clustering_params
             )
-            
+
             # 记录聚类统计信息
-            self._log_clustering_statistics(signal_slice, cluster_results, unclustered_data, clustering_params)
-            
+            self._log_clustering_statistics(
+                data, slice_index, cluster_results, unclustered_data, clustering_params
+            )
+
             return cluster_results, unclustered_data
             
         except Exception as e:
-            error_msg = f"信号切片聚类失败: {str(e)}"
+            data_type = "SignalSlice" if isinstance(signal_data, SignalSlice) else "UnclusteredPulseData"
+            error_msg = f"{data_type}聚类失败: {str(e)}"
             system_logger.error(error_msg)
             raise ValidationError(error_msg) from e
     
@@ -144,19 +167,19 @@ class DBSCANClusteringService:
             # 使用配置文件默认值作为回退
             return self._get_default_clustering_params(dimension)
     
-    def _validate_inputs(self, signal_slice: SignalSlice, clustering_params: ClusteringParams) -> None:
+    def _validate_inputs(self, signal_data: Union[SignalSlice, UnclusteredPulseData], clustering_params: ClusteringParams) -> None:
         """验证输入参数
-        
+
         Args:
-            signal_slice: 信号切片
+            signal_data: 信号数据（SignalSlice或UnclusteredPulseData）
             clustering_params: 聚类参数
-            
+
         Raises:
             ValidationError: 参数验证失败时
         """
-        if not isinstance(signal_slice, SignalSlice):
-            raise ValidationError(f"signal_slice必须为SignalSlice类型，当前类型: {type(signal_slice)}")
-        
+        if not isinstance(signal_data, (SignalSlice, UnclusteredPulseData)):
+            raise ValidationError(f"signal_data必须为SignalSlice或UnclusteredPulseData类型，当前类型: {type(signal_data)}")
+
         if not isinstance(clustering_params, ClusteringParams):
             raise ValidationError(f"clustering_params必须为ClusteringParams类型，当前类型: {type(clustering_params)}")
     
@@ -208,13 +231,17 @@ class DBSCANClusteringService:
             raise ValidationError(error_msg) from e
 
     def _process_clustering_results(self,
-                                  signal_slice: SignalSlice,
+                                  data: np.ndarray,
+                                  slice_index: int,
+                                  time_range: TimeRange,
                                   cluster_labels: np.ndarray,
                                   params: ClusteringParams) -> Tuple[List[ClusterResult], Optional[UnclusteredPulseData]]:
         """处理聚类结果
 
         Args:
-            signal_slice: 原始信号切片
+            data: 原始数据数组
+            slice_index: 切片索引
+            time_range: 时间范围
             cluster_labels: DBSCAN聚类标签
             params: 聚类参数
 
@@ -235,15 +262,15 @@ class DBSCANClusteringService:
             else:
                 # 有效聚类
                 cluster_indices = np.where(cluster_labels == label)[0]
-                cluster_data = signal_slice.data[cluster_indices]
+                cluster_data = data[cluster_indices]
 
                 # 创建聚类结果实体
                 cluster_result = ClusterResult(
                     cluster_data=cluster_data,
-                    slice_index=signal_slice.slice_index,
+                    slice_index=slice_index,
                     cluster_index=label,
                     dim_name=params.dimension,
-                    time_ranges=signal_slice.time_range,
+                    time_ranges=time_range,
                     dimension_category_index=0  # 默认为0，可根据需要调整
                 )
                 cluster_results.append(cluster_result)
@@ -251,36 +278,38 @@ class DBSCANClusteringService:
         # 处理未聚类数据
         unclustered_data = None
         if unclustered_indices:
-            unclustered_pulse_data = signal_slice.data[unclustered_indices]
+            unclustered_pulse_data = data[unclustered_indices]
             unclustered_data = UnclusteredPulseData(
                 pulse_data=unclustered_pulse_data,
-                slice_index=signal_slice.slice_index,
+                slice_index=slice_index,
                 clustering_dimension=params.dimension,
-                time_ranges=signal_slice.time_range,
+                time_ranges=time_range,
                 successful_cluster_count=len(cluster_results)
             )
 
         return cluster_results, unclustered_data
 
     def _log_clustering_statistics(self,
-                                 signal_slice: SignalSlice,
+                                 data: np.ndarray,
+                                 slice_index: int,
                                  cluster_results: List[ClusterResult],
                                  unclustered_data: Optional[UnclusteredPulseData],
                                  params: ClusteringParams) -> None:
         """记录聚类统计信息
 
         Args:
-            signal_slice: 原始信号切片
+            data: 原始数据数组
+            slice_index: 切片索引
             cluster_results: 聚类结果列表
             unclustered_data: 未聚类数据
             params: 聚类参数
         """
-        total_points = signal_slice.point_count
+        total_points = data.shape[0]
         clustered_points = sum(len(result.cluster_data) for result in cluster_results)
         unclustered_points = len(unclustered_data.pulse_data) if unclustered_data else 0
 
         system_logger.info(
-            f"聚类完成 - 切片: {signal_slice.id}, 维度: {params.dimension}, "
+            f"聚类完成 - 切片索引: {slice_index}, 维度: {params.dimension}, "
             f"总数据点: {total_points}, 聚类数: {len(cluster_results)}, "
             f"已聚类点数: {clustered_points}, 未聚类点数: {unclustered_points}"
         )
