@@ -8,7 +8,6 @@ from pathlib import Path
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
-from radar_system.application.tasks.signal_tasks import SignalImportTask
 from radar_system.infrastructure.common.logging import ui_logger
 from radar_system.infrastructure.common.thread_safe_signal_emitter import ThreadSafeSignalEmitter
 
@@ -85,7 +84,7 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
     
     def import_data(self, window, file_path: str) -> None:
         """导入文件
-        
+
         Args:
             window: 主窗口实例
             file_path: 要导入的文件路径
@@ -93,31 +92,28 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
         if not file_path:
             QMessageBox.warning(window, "警告", "请先选择要导入的文件")
             return
-        
+
         try:
             # 验证文件存在
             if not Path(file_path).exists():
                 error_msg = f"文件不存在: {file_path}"
                 QMessageBox.warning(window, "警告", error_msg)
                 return
-            
+
             # 发送导入开始信号
             self.import_started.emit()
-            
-            # 创建导入任务（移除event_bus参数）
-            import_task = SignalImportTask(
-                file_path=file_path,
-                service=window.signal_service
+
+            # 直接提交Service方法到线程池，消除Task抽象层
+            future = window.thread_pool.submit(
+                window.signal_service.load_signal_file,
+                file_path
             )
-            
-            # 提交任务到线程池
-            future = window.thread_pool.submit(import_task.execute)
             future.add_done_callback(
                 lambda f: self._handle_import_result(f, window)
             )
-            
+
             ui_logger.info(f"信号导入任务已启动: {file_path}")
-            
+
         except Exception as e:
             error_msg = f"导入处理出错: {str(e)}"
             ui_logger.error(error_msg)
@@ -125,21 +121,24 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
             self.safe_emit_signal(self.import_completed, False, error_msg)
     
     def _handle_import_result(self, future, window) -> None:
-        """处理导入任务的执行结果
+        """处理导入Service执行结果
+
+        直接处理SignalService.load_signal_file的返回结果，
+        消除了Task抽象层，简化了调用链。
 
         Args:
-            future: Future对象，包含任务执行结果
+            future: Future对象，包含Service执行结果
             window: 主窗口实例
         """
         try:
             success, message, signal = future.result()
 
             if success and signal:
-                ui_logger.info(f"导入任务完成: {signal.id}")
+                ui_logger.info(f"导入完成: {signal.id}")
                 # 发射导入成功信号
                 self.safe_emit_signal(self.import_completed, True, "导入成功")
             else:
-                ui_logger.error(f"导入任务失败: {message}")
+                ui_logger.error(f"导入失败: {message}")
                 # 发射导入失败信号
                 self.safe_emit_signal(self.import_completed, False, message)
 

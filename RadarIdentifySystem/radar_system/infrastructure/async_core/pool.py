@@ -4,11 +4,6 @@
 """
 from typing import Optional, List, Any, Callable
 from concurrent.futures import Future, ThreadPoolExecutor
-import asyncio
-import threading
-
-from radar_system.infrastructure.async_core.worker import Worker
-from radar_system.infrastructure.async_core.task_queue import TaskQueue, Task
 from radar_system.infrastructure.common.logging import system_logger
 from radar_system.infrastructure.common.exceptions import ProcessingError
 

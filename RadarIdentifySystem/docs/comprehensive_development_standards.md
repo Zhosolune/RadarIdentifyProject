@@ -81,12 +81,17 @@ class SignalService:
 
 #### 直接参数传递原则
 ```python
-# ✅ 简化方案：直接传递具体类型，避免不必要的转换
+# ✅ 简化方案：Handler直接调用Service，避免不必要的抽象层
 class SignalImportHandler:
-    def start_import(self, window, file_path: str):
-        # 直接传递具体参数，无需复杂的转换接口
-        task = SignalImportTask(file_path=file_path, service=window.signal_service)
-        future = window.thread_pool.submit(task.execute)
+    def import_data(self, window, file_path: str):
+        # 直接提交Service方法到线程池，消除Task抽象层
+        future = window.thread_pool.submit(
+            window.signal_service.load_signal_file,
+            file_path
+        )
+        future.add_done_callback(
+            lambda f: self._handle_import_result(f, window)
+        )
 
 class SignalService:
     def load_signal_file(self, file_path: str) -> Tuple[bool, str, Optional[SignalData]]:
@@ -196,9 +201,9 @@ class SignalSliceHandler:      # ✅ 正确
 class SignalService:           # ✅ 正确
 class RecognitionService:      # ✅ 正确
 
-# Task类：{Entity}{Action}Task
-class SignalImportTask:        # ✅ 正确
-class SignalSliceTask:         # ✅ 正确
+# Handler类：{Entity}{Action}Handler
+class SignalImportHandler:     # ✅ 正确
+class SignalSliceHandler:      # ✅ 正确
 
 # Entity类：{Domain}{Entity}
 class SignalData:              # ✅ 正确
@@ -248,10 +253,8 @@ radar_system/
 │   └── views/
 │       └── main_window.py
 ├── application/
-│   ├── services/
-│   │   └── signal_service.py             # {domain}_service.py
-│   └── tasks/
-│       └── signal_tasks.py               # {domain}_tasks.py
+│   └── services/
+│       └── signal_service.py             # {domain}_service.py
 ├── domain/
 │   └── signal/
 │       ├── entities/
@@ -296,10 +299,14 @@ class SignalSliceHandler:
         slice_task = SignalSliceTask(signal=signal, service=window.signal_service)
         future = window.thread_pool.submit(slice_task.execute)
 
-class SignalSliceTask:
-    def execute(self):
-        # Task层 → Service层
-        return self.service.start_slice_processing(self.signal)
+class SignalSliceHandler:
+    def start_slice(self, signal, thread_pool):
+        # Handler层 → Service层（直接异步调用）
+        future = thread_pool.submit(
+            self.signal_service.start_slice_processing,
+            signal
+        )
+        future.add_done_callback(self._handle_slice_result)
 
 class SignalService:
     def start_slice_processing(self, signal: SignalData):
@@ -731,20 +738,17 @@ class TaskResultHandler:
 
 # 使用示例
 class SignalSliceHandler(ThreadSafeSignalEmitter):
-    def __init__(self):
+    def __init__(self, signal_service: SignalService):
         super().__init__()
-        self.result_handler = TaskResultHandler(self)
+        self.signal_service = signal_service
 
-    def start_slice(self, window, signal: SignalData):
-        slice_task = SignalSliceTask(signal=signal, service=window.signal_service)
-        future = window.thread_pool.submit(slice_task.execute)
-
-        # 使用统一的结果处理器
-        future.add_done_callback(
-            lambda f: self.result_handler.handle_task_result(
-                f, window, self.slice_completed, self.slice_failed
-            )
+    def start_slice(self, signal: SignalData, thread_pool):
+        # 直接提交Service方法到线程池，消除Task抽象层
+        future = thread_pool.submit(
+            self.signal_service.start_slice_processing,
+            signal
         )
+        future.add_done_callback(self._handle_slice_result)
 ```
 
 ## 8. 实施指导和代码示例

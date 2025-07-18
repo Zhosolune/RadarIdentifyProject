@@ -122,10 +122,7 @@ RadarIdentifySystem/radar_system/domain/recognition/repositories/result_reposito
 2. 应用层 (Application Layer)
 RadarIdentifySystem/radar_system/application/services/signal_service.py    # 信号处理应用服务
 RadarIdentifySystem/radar_system/application/services/recognition_service.py # 识别处理应用服务
-RadarIdentifySystem/radar_system/application/tasks/task_manager.py        # 任务管理器
-RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py        # 信号处理任务
-RadarIdentifySystem/radar_system/application/tasks/recognition_tasks.py   # 识别处理任务
-RadarIdentifySystem/radar_system/application/tasks/visualization_tasks.py # 可视化任务
+# 任务相关文件已删除，采用Handler直接调用Service的简化架构
 RadarIdentifySystem/radar_system/application/events/signal_events.py      # 信号处理事件
 RadarIdentifySystem/radar_system/application/events/recognition_events.py # 识别处理事件
 

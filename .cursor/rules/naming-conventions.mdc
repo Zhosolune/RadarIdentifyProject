@@ -17,7 +17,7 @@ description: "RadarIdentifySystem命名规范"
 ```python
 class SignalService:              # {Domain}Service
 class SignalImportHandler:        # {Entity}{Action}Handler  
-class SignalImportTask:           # {Entity}{Action}Task
+class SignalImportHandler:        # {Entity}{Action}Handler
 class SignalData:                 # {Entity}Data
 class RecognitionResult:          # {Entity}Result
 ```

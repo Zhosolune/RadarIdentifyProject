@@ -10,7 +10,6 @@ from PyQt5.QtWidgets import QApplication, QMessageBox
 from radar_system.infrastructure.common.logging import ui_logger
 from radar_system.infrastructure.common.thread_safe_signal_emitter import ThreadSafeSignalEmitter
 
-from radar_system.application.tasks.signal_tasks import SignalSliceTask
 from radar_system.application.services.signal_service import SignalService
 from radar_system.domain.signal.entities.signal import SignalData, SignalSlice
 
@@ -55,6 +54,7 @@ class SignalSliceHandler(ThreadSafeSignalEmitter):
 
         符合DDD分层架构：Handler层直接使用注入的SignalService，
         不再依赖UI层实例来访问Application层服务。
+        消除Task抽象层，直接调用Service方法。
 
         Args:
             signal: 待切片的信号数据
@@ -70,14 +70,11 @@ class SignalSliceHandler(ThreadSafeSignalEmitter):
             # 发射切片开始信号
             self.safe_emit_signal(self.slice_started)
 
-            # 创建切片任务，使用注入的SignalService
-            slice_task = SignalSliceTask(
-                signal=signal,
-                service=self.signal_service
+            # 直接提交Service方法到线程池，消除Task抽象层
+            future = thread_pool.submit(
+                self.signal_service.start_slice_processing,
+                signal
             )
-
-            # 提交任务到线程池
-            future = thread_pool.submit(slice_task.execute)
             future.add_done_callback(
                 lambda f: self._handle_slice_result(f)
             )
@@ -91,22 +88,24 @@ class SignalSliceHandler(ThreadSafeSignalEmitter):
                 message_callback("错误", error_msg, QMessageBox.Critical)
     
     def _handle_slice_result(self, future) -> None:
-        """处理切片任务结果
+        """处理切片Service执行结果
 
+        直接处理SignalService.start_slice_processing的返回结果，
+        消除了Task抽象层，简化了调用链。
         符合DDD分层架构：使用注入的SignalService，不依赖UI层实例。
         """
         try:
             success, message, slices = future.result()
 
             if success and slices:
-                ui_logger.info(f"切片任务完成，生成{len(slices)}个切片")
+                ui_logger.info(f"切片完成，生成{len(slices)}个切片")
                 # 发送切片完成信号
                 self.safe_emit_signal(self.slice_completed, True, len(slices))
 
                 # ✅ 架构合规：直接使用注入的SignalService
                 self.request_next_slice()
             else:
-                ui_logger.error(f"切片任务失败: {message}")
+                ui_logger.error(f"切片失败: {message}")
                 # 发送切片失败信号
                 self.safe_emit_signal(self.slice_failed, message)
 

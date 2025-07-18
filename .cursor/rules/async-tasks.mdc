@@ -5,32 +5,31 @@ description: "异步处理和任务规范"
 
 # 异步处理和任务规范
 
-## 任务实现模式
-使用简化的任务设计，参考 [signal_tasks.py](mdc:RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py):
+## 异步处理模式
+使用简化的Handler直接调用Service设计:
 
-✅ **正确示例** - 任务基类和具体实现:
+✅ **正确示例** - Handler直接调用Service:
 ```python
-@dataclass
-class SignalProcessingTask:
-    signal_data: SignalData
-    service: SignalService
-    operation_type: str
+class SignalSliceHandler(ThreadSafeSignalEmitter):
+    def __init__(self, signal_service: SignalService):
+        super().__init__()
+        self.signal_service = signal_service
 
-    def execute(self) -> Tuple[bool, str, Optional[Any]]:
-        try:
-            if self.operation_type == "slice":
-                return self.service.start_slice_processing(self.signal_data)
-            else:
-                return False, f"不支持的操作类型: {self.operation_type}", None
-        except Exception as e:
-            return False, f"任务执行失败: {str(e)}", None
+    def start_slice(self, signal: SignalData, thread_pool):
+        # 直接提交Service方法到线程池，消除Task抽象层
+        future = thread_pool.submit(
+            self.signal_service.start_slice_processing,
+            signal
+        )
+        future.add_done_callback(self._handle_slice_result)
 ```
 
-❌ **错误示例** - 复杂的任务继承层次:
+❌ **错误示例** - 过度抽象的Task层:
 ```python
-class BaseTask(ABC):
-    # 避免过度抽象的基类
-    pass
+class SignalSliceTask:
+    # 避免不必要的Task抽象层
+    def execute(self):
+        return self.service.start_slice_processing(self.signal)
 ```
 
 ## 线程池使用规范

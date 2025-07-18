@@ -4,32 +4,31 @@ type: "always_apply"
 
 # 异步处理和任务规范
 
-## 任务实现模式
-使用简化的任务设计，参考 [signal_tasks.py](mdc:RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py):
+## 异步处理模式
+使用简化的Handler直接调用Service设计:
 
-✅ **正确示例** - 任务基类和具体实现:
+✅ **正确示例** - Handler直接调用Service:
 ```python
-@dataclass
-class SignalProcessingTask:
-    signal_data: SignalData
-    service: SignalService
-    operation_type: str
+class SignalSliceHandler(ThreadSafeSignalEmitter):
+    def __init__(self, signal_service: SignalService):
+        super().__init__()
+        self.signal_service = signal_service
 
-    def execute(self) -> Tuple[bool, str, Optional[Any]]:
-        try:
-            if self.operation_type == "slice":
-                return self.service.start_slice_processing(self.signal_data)
-            else:
-                return False, f"不支持的操作类型: {self.operation_type}", None
-        except Exception as e:
-            return False, f"任务执行失败: {str(e)}", None
+    def start_slice(self, signal: SignalData, thread_pool):
+        # 直接提交Service方法到线程池，消除Task抽象层
+        future = thread_pool.submit(
+            self.signal_service.start_slice_processing,
+            signal
+        )
+        future.add_done_callback(self._handle_slice_result)
 ```
 
-❌ **错误示例** - 复杂的任务继承层次:
+❌ **错误示例** - 过度抽象的Task层:
 ```python
-class BaseTask(ABC):
-    # 避免过度抽象的基类
-    pass
+class SignalSliceTask:
+    # 避免不必要的Task抽象层
+    def execute(self):
+        return self.service.start_slice_processing(self.signal)
 ```
 
 ## 线程池使用规范
@@ -92,16 +91,16 @@ class SignalImportHandler(ThreadSafeSignalEmitter):
         self.safe_emit_signal(self.import_completed, success, result)
 ```
 
-## 任务生命周期管理
-- **创建任务**: 在UI层创建具体任务实例
-- **提交任务**: 通过线程池提交到后台执行
-- **监听结果**: 通过回调函数处理任务结果
+## 异步处理生命周期管理
+- **接收事件**: Handler接收UI事件
+- **提交Service**: 直接将Service方法提交到线程池
+- **监听结果**: 通过回调函数处理Service执行结果
 - **信号发射**: 使用线程安全方式发射信号到UI
 
-## 任务类型规范
-定义标准的任务类型常量:
+## 操作类型规范
+定义标准的操作类型常量:
 ```python
-class TaskType:
+class OperationType:
     SIGNAL_IMPORT = "signal_import"
     SIGNAL_SLICE = "signal_slice"
     SIGNAL_RECOGNITION = "signal_recognition"

@@ -49,10 +49,7 @@
     2. 应用层 (Application Layer)
     RadarIdentifySystem/radar_system/application/services/signal_service.py    # 信号处理应用服务
     RadarIdentifySystem/radar_system/application/services/recognition_service.py # 识别处理应用服务
-    RadarIdentifySystem/radar_system/application/tasks/task_manager.py        # 任务管理器
-    RadarIdentifySystem/radar_system/application/tasks/signal_tasks.py        # 信号处理任务
-    RadarIdentifySystem/radar_system/application/tasks/recognition_tasks.py   # 识别处理任务
-    RadarIdentifySystem/radar_system/application/tasks/visualization_tasks.py # 可视化任务
+    # 任务相关文件已删除，采用Handler直接调用Service的简化架构
     RadarIdentifySystem/radar_system/application/events/signal_events.py      # 信号处理事件
     RadarIdentifySystem/radar_system/application/events/recognition_events.py # 识别处理事件
 
@@ -107,11 +104,7 @@
         - signal_service.py: 协调信号处理流程，包括数据加载、预处理等
         - recognition_service.py: 协调识别流程，包括特征提取、模型预测等
 
-        b) tasks包
-        - task_manager.py: 管理异步任务的执行和调度
-        - signal_tasks.py: 处理信号相关的异步任务
-        - recognition_tasks.py: 处理识别相关的异步任务
-        - visualization_tasks.py: 处理可视化相关的异步任务
+        # tasks包已删除，采用Handler直接调用Service的简化架构
 
         c) events包
         - signal_events.py: 定义信号处理相关事件

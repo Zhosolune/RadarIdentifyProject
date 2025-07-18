@@ -55,7 +55,7 @@ radar_system/
 ### 2.2 文件命名规范
 - **服务类文件**：`{domain}_service.py` (如：signal_service.py)
 - **处理器文件**：`{entity}_{action}_handler.py` (如：signal_import_handler.py)
-- **任务文件**：`{domain}_tasks.py` (如：signal_tasks.py)
+- **服务文件**：`{domain}_service.py` (如：signal_service.py)
 - **实体文件**：`{entity}.py` (如：signal.py)
 - **测试文件**：`test_{module_name}.py`
 
@@ -66,7 +66,7 @@ radar_system/
 # ✅ 正确示例
 class SignalService:              # {Domain}Service
 class SignalImportHandler:        # {Entity}{Action}Handler
-class SignalImportTask:           # {Entity}{Action}Task
+class SignalImportHandler:        # {Entity}{Action}Handler
 class SignalData:                 # {Entity}Data
 class RecognitionResult:          # {Entity}Result
 

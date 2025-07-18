@@ -597,11 +597,6 @@ class MainWindow(QMainWindow):
                         self.slice_info_label2.setText(
                             f"共获得{slice_count}个250ms切片"
                         )
-                    
-                    # 显示第一个切片
-                    current_index, _ = self.signal_service.get_slice_info()
-                    if current_index == 0:  # 还没有显示任何切片
-                        self.slice_handler.show_next_slice(self)
                         
         except Exception as e:
             ui_logger.error(f"处理切片完成事件时出错: {str(e)}")
@@ -649,12 +644,13 @@ class MainWindow(QMainWindow):
         """
         try:
             # 预防性检查：按钮应该已经被禁用，这是额外的安全检查
-            if self.signal_service.is_last_slice():
-                ui_logger.warning("'下一片'按钮在最后一个切片时被点击，这不应该发生")
-                self.next_slice_btn.setEnabled(False)
-                return
+            # 这是个跨层调用，废除
+            # if self.signal_service.is_last_slice():
+            #     ui_logger.warning("'下一片'按钮在最后一个切片时被点击，这不应该发生")
+            #     self.next_slice_btn.setEnabled(False)
+            #     return
 
-            # 通过Handler层请求下一个切片，符合DDD分层架构
+            # 请求下一个切片
             success = self.slice_handler.request_next_slice()
 
             # 如果请求失败，记录日志但不显示错误对话框（预防性设计）
